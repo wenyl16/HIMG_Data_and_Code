@@ -1,0 +1,4 @@
+﻿method,ahead_count,behind_count,coincident_count,no_economic_crossover_count,missing_flexibility_knee_count,total_cases,comparable_cases,ahead_percent_of_comparable,behind_percent_of_comparable,coincident_percent_of_comparable
+maximum_curvature,18,1,0,1,0,20,19,94.7368421053,5.2631578947,0.0000000000
+kneedle,17,2,0,1,0,20,19,89.4736842105,10.5263157895,0.0000000000
+L_method,17,2,0,1,0,20,19,89.4736842105,10.5263157895,0.0000000000

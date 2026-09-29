@@ -1,0 +1,13 @@
+﻿scenario,method,ahead_count,behind_count,coincident_count,no_economic_crossover_count,missing_flexibility_knee_count,total_cases,comparable_cases,ahead_percent_of_comparable,behind_percent_of_comparable,coincident_percent_of_comparable
+Industrial,maximum_curvature,5,0,0,0,0,5,5,100.0000000000,0.0000000000,0.0000000000
+Industrial,kneedle,4,1,0,0,0,5,5,80.0000000000,20.0000000000,0.0000000000
+Industrial,L_method,4,1,0,0,0,5,5,80.0000000000,20.0000000000,0.0000000000
+Commercial,maximum_curvature,5,0,0,0,0,5,5,100.0000000000,0.0000000000,0.0000000000
+Commercial,kneedle,5,0,0,0,0,5,5,100.0000000000,0.0000000000,0.0000000000
+Commercial,L_method,5,0,0,0,0,5,5,100.0000000000,0.0000000000,0.0000000000
+Rural,maximum_curvature,4,1,0,0,0,5,5,80.0000000000,20.0000000000,0.0000000000
+Rural,kneedle,4,1,0,0,0,5,5,80.0000000000,20.0000000000,0.0000000000
+Rural,L_method,4,1,0,0,0,5,5,80.0000000000,20.0000000000,0.0000000000
+Island,maximum_curvature,4,0,0,1,0,5,4,100.0000000000,0.0000000000,0.0000000000
+Island,kneedle,4,0,0,1,0,5,4,100.0000000000,0.0000000000,0.0000000000
+Island,L_method,4,0,0,1,0,5,4,100.0000000000,0.0000000000,0.0000000000

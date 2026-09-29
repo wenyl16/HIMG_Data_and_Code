@@ -1,0 +1,23 @@
+Flexibility turning-point deviations from economic breakeven.
+
+Symbols on the main axis show turning-point penetration minus economic breakeven penetration, in percentage points, for one method at the same scenario and consumption target. Negative values indicate an earlier flexibility turning point; positive values indicate an earlier economic breakeven. The dashed vertical line is zero deviation.
+
+Circle, triangle and square denote maximum curvature, Kneedle and L_method, respectively. Filled symbols and numeric labels identify economic breakeven preceding the turning point. Small vertical offsets separate the symbols within each target row; the x coordinates are unaltered. Grey lines connect the minimum and maximum estimates across methods; these are not confidence intervals.
+
+The figure contains 57 comparable method estimates; economic breakeven precedes 5 of them. Estimates from different methods are not independent scenario replicates. No inferential test is performed.
+
+Thresholds use the existing comparison workflow: saved flexibility knees from the 200 h storage-duration analysis and economic crossings recomputed from baseline data with price factor 1.0, penetration 0--99.9%, and minimum off-grid duration capped at 500 h. The two duration limits retain their respective original definitions.
+
+Differences within 0.0001 percentage points are treated as coincident. For a target without an economic crossing in the analysed domain, breakeven is assumed to be 100% for positioning only: x = turning-point penetration minus 100%. These three symbols have dashed outlines; their connector remains solid. The source economic threshold stays missing, and the assumed positions are excluded from the comparable count and ordering statistics.
+
+Highlighted estimates (turning point minus breakeven, percentage points):
+
+Rural, 100%, Maximum curvature: +8.3604
+
+Rural, 100%, Kneedle: +10.9707
+
+Rural, 100%, L_method: +12.2759
+
+Industrial, 100%, Kneedle: +1.3485
+
+Industrial, 100%, L_method: +1.3485
