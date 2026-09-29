@@ -488,7 +488,7 @@ z
     <text style="font-weight: 700; font-size: 9px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start" x="17.900804" y="14.394375" transform="rotate(-0 17.900804 14.394375)">a</text>
    </g>
    <g id="text_16">
-    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: middle" x="131.948804" y="14.669669" transform="rotate(-0 131.948804 14.669669)">乡村</text>
+    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: middle" x="131.948804" y="14.669669" transform="rotate(-0 131.948804 14.669669)">Rural</text>
    </g>
    <g id="line2d_13">
     <path d="M 34.4181 155.268016 
@@ -1451,7 +1451,7 @@ z
     <text style="font-weight: 700; font-size: 9px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start" x="277.458321" y="14.394375" transform="rotate(-0 277.458321 14.394375)">b</text>
    </g>
    <g id="text_31">
-    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: middle" x="391.506321" y="14.669669" transform="rotate(-0 391.506321 14.669669)">商业</text>
+    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: middle" x="391.506321" y="14.669669" transform="rotate(-0 391.506321 14.669669)">Commercial</text>
    </g>
    <g id="line2d_45">
     <path d="M 293.385714 155.268016 
@@ -2984,7 +2984,7 @@ z
     <text style="font-weight: 700; font-size: 9px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start" x="17.900804" y="205.524028" transform="rotate(-0 17.900804 205.524028)">c</text>
    </g>
    <g id="text_48">
-    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: middle" x="131.948804" y="205.799322" transform="rotate(-0 131.948804 205.799322)">工业</text>
+    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: middle" x="131.948804" y="205.799322" transform="rotate(-0 131.948804 205.799322)">Industrial</text>
    </g>
    <g id="line2d_77">
     <path d="M 33.710216 346.397669 
@@ -3878,7 +3878,7 @@ z
     <text style="font-weight: 700; font-size: 9px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start" x="277.458321" y="205.524028" transform="rotate(-0 277.458321 205.524028)">d</text>
    </g>
    <g id="text_64">
-    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: middle" x="391.506321" y="205.799322" transform="rotate(-0 391.506321 205.799322)">海岛</text>
+    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: middle" x="391.506321" y="205.799322" transform="rotate(-0 391.506321 205.799322)">Island</text>
    </g>
    <g id="line2d_109">
     <path d="M 293.346387 346.397669 
@@ -4180,7 +4180,7 @@ z
     </g>
    </g>
    <g id="text_70">
-    <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start" x="239.486969" y="385.618169" transform="rotate(-0 239.486969 385.618169)">曲率最大</text>
+    <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start" x="239.486969" y="385.618169" transform="rotate(-0 239.486969 385.618169)">Maximum curvature</text>
    </g>
    <g id="line2d_135">
     <defs>

@@ -4,13 +4,13 @@
 calc_h2_offgrid_duration.py
 ===========================
 
-基于 sensitivity_h2_sizing_results.xlsx 中的每组 PV + BESS + H2 容量配置，
-利用 Annual_8760.xlsx 的全年8760h 数据，仿真计算微网离网运行时长。
+For each PV + BESS + H2 capacity configuration in sensitivity_h2_sizing_results.xlsx,
+simulate microgrid off-grid duration using the annual 8760-hour data in Annual_8760.xlsx.
 
-系统组成：PV + 原有BESS(2.5MW/5MWh) + 氢储能(电解槽+燃料电池+储氢罐)
-调度规则：
-  富余: PV→负荷 → BESS充电 → 电解槽制氢 → 弃光
-  缺口: PV→负荷 → BESS放电 → 燃料电池发电 → 失败
+System: PV + existing BESS (2.5 MW/5 MWh) + hydrogen storage (electrolyzer, fuel cell, and tank).
+Dispatch rules:
+  Surplus: PV -> load -> BESS charging -> hydrogen production -> curtailment.
+  Deficit: PV -> load -> BESS discharge -> fuel cell generation -> supply failure.
 """
 
 import os
@@ -30,12 +30,12 @@ except ImportError:
         return it
 
 # ╔══════════════════════════════════════════════════════════════╗
-# ║                       参 数 设 置                           ║
+#                       Parameter settings
 # ╚══════════════════════════════════════════════════════════════╝
 
 PV_BASE_CAPACITY_MW = 1
-BASE_BESS_POWER_KW = 7500  # Zambia 原有电池 7.5MW (与 sizing P_BAT_MAX 对齐)
-BASE_BESS_ENERGY_KWH = 15000  # Zambia 原有电池 15MWh (与 sizing E_BAT_MAX 对齐)
+BASE_BESS_POWER_KW = 7500  # Zambia existing battery: 7.5 MW, matching sizing P_BAT_MAX.
+BASE_BESS_ENERGY_KWH = 15000  # Zambia existing battery: 15 MWh, matching sizing E_BAT_MAX.
 BESS_CHARGE_EFF = 0.95
 BESS_DISCHARGE_EFF = 0.95
 BESS_SOC_MIN = 0.10
@@ -57,11 +57,11 @@ FIGURES_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "offgr
 
 
 # ╔══════════════════════════════════════════════════════════════╗
-# ║                     数 据 读 取                              ║
+#                       Data loading
 # ╚══════════════════════════════════════════════════════════════╝
 
 def load_8760_data(filepath=INPUT_8760):
-    print(f"[数据] 读取 {filepath} ...")
+    print(f"[Data] Reading {filepath} ...")
     df_pv = pd.read_excel(filepath, sheet_name="PV", header=None)
     pv_raw = pd.to_numeric(df_pv.iloc[:, 1], errors="coerce").values.astype(float)
     df_load = pd.read_excel(filepath, sheet_name="Load", header=None)
@@ -78,15 +78,15 @@ def load_8760_data(filepath=INPUT_8760):
             s.bfill(inplace=True)
             arr[:] = s.values
 
-    print(f"  PV: 均值={np.mean(pv_raw):.1f} kW, 峰值={np.max(pv_raw):.1f} kW")
-    print(f"  Load: 均值={np.mean(load):.1f} kW, 峰值={np.max(load):.1f} kW")
+    print(f"  PV: mean={np.mean(pv_raw):.1f} kW, peak={np.max(pv_raw):.1f} kW")
+    print(f"  Load: mean={np.mean(load):.1f} kW, peak={np.max(load):.1f} kW")
     return pv_raw, load
 
 
 def load_sensitivity(filepath=INPUT_SENSITIVITY):
-    print(f"[数据] 读取 {filepath} ...")
+    print(f"[Data] Reading {filepath} ...")
     df = pd.read_excel(filepath, sheet_name="Results")
-    print(f"  {len(df)} 行配置")
+    print(f"  {len(df)} configurations")
     return df
 
 
@@ -100,12 +100,12 @@ def generate_start_info(n_hours=8760):
                 start_hours.append(sh)
                 start_days.append(d + 1)
                 start_hod.append(h)
-    print(f"[起点] 共 {len(start_hours)} 个断网起点")
+    print(f"[Outage starts] {len(start_hours)} starting times")
     return np.array(start_hours), np.array(start_days), np.array(start_hod)
 
 
 # ╔══════════════════════════════════════════════════════════════╗
-# ║          向 量 化 仿 真 核 心 (BESS + H2)                   ║
+#                       Vectorized simulation (BESS + H2)
 # ╚══════════════════════════════════════════════════════════════╝
 
 def simulate_vectorized(pv_avail, load, elec_kw, fc_kw, h2_tank_kg,
@@ -114,15 +114,15 @@ def simulate_vectorized(pv_avail, load, elec_kw, fc_kw, h2_tank_kg,
                         initial_h2_soc=INITIAL_H2_SOC,
                         n_hours=8760):
     """
-    对所有断网起点同时仿真 PV + BESS + H2 离网运行。
+    Simulate PV + BESS + H2 off-grid operation for all outage starting times.
 
-    调度规则:
-      富余: PV→load, 剩余→BESS充电, 再剩余→电解槽制氢, 再剩余→弃光
-      缺口: PV→load, 缺口→BESS放电, 再缺口→燃料电池(H2), 再缺口→失败
+    Dispatch rules:
+      Surplus: PV -> load, then BESS charging, hydrogen production, and curtailment.
+      Deficit: PV -> load, then BESS discharge, fuel cell generation, and supply failure.
     """
     n_events = len(start_hours)
 
-    # 状态
+    # State variables
     bess_soc = np.full(n_events, initial_bess_soc, dtype=np.float64)
     h2_kg = np.full(n_events, initial_h2_soc * h2_tank_kg, dtype=np.float64)
     alive = np.ones(n_events, dtype=bool)
@@ -137,15 +137,15 @@ def simulate_vectorized(pv_avail, load, elec_kw, fc_kw, h2_tank_kg,
         pv_now = pv_avail[t_indices]
         load_now = alpha * load[t_indices]
 
-        # PV → 负荷
+        # PV -> load
         pv_to_load = np.minimum(pv_now, load_now)
         deficit = load_now - pv_to_load
 
-        # ═══ 缺口处理 ═══
+        # Handle generation deficits.
         need_discharge = alive & (deficit > 0)
         if need_discharge.any():
 
-            # Step 1: BESS放电
+            # Step 1: Discharge the BESS.
             bess_avail_energy = np.maximum(0.0, (bess_soc - BESS_SOC_MIN) * BASE_BESS_ENERGY_KWH)
             bess_avail_output = bess_avail_energy * BESS_DISCHARGE_EFF
             bess_max_discharge = np.minimum(BASE_BESS_POWER_KW, bess_avail_output)
@@ -154,7 +154,7 @@ def simulate_vectorized(pv_avail, load, elec_kw, fc_kw, h2_tank_kg,
             bess_soc = np.maximum(bess_soc, BESS_SOC_MIN)
             deficit_after_bess = deficit - bess_discharge
 
-            # Step 2: 燃料电池
+            # Step 2: Generate power with the fuel cell.
             remaining_deficit = np.where(need_discharge, np.maximum(0.0, deficit_after_bess), 0.0)
             need_fc = need_discharge & (remaining_deficit > 1e-6)
 
@@ -167,7 +167,7 @@ def simulate_vectorized(pv_avail, load, elec_kw, fc_kw, h2_tank_kg,
                 h2_kg = np.maximum(h2_kg, 0.0)
                 final_deficit = remaining_deficit - fc_output
 
-                # 检查失败
+                # Check for supply failure.
                 failed = need_fc & (final_deficit > 1e-6)
                 if failed.any():
                     idx = np.where(failed)[0]
@@ -176,7 +176,7 @@ def simulate_vectorized(pv_avail, load, elec_kw, fc_kw, h2_tank_kg,
                             alive[i] = False
                             autonomy[i] = rel_h
                             ae = avail_fc_energy[i]
-                            rd = remaining_deficit[i]   # FC 出力前的缺口(修复: 原误用 final_deficit 导致标签失真)
+                            rd = remaining_deficit[i]   # Deficit before FC output; using final_deficit here previously misclassified failures.
                             if ae < rd - 1e-6:
                                 fail_reason[i] = "h2_depleted"
                             elif fc_kw < rd - 1e-6:
@@ -184,7 +184,7 @@ def simulate_vectorized(pv_avail, load, elec_kw, fc_kw, h2_tank_kg,
                             else:
                                 fail_reason[i] = "pv_bess_h2_insufficient"
             else:
-                # BESS放电后仍不足，但无FC或不需要FC
+                # A deficit remains after BESS discharge, but no FC is available or engaged.
                 failed = need_discharge & (deficit_after_bess > 1e-6) & (~need_fc | (remaining_deficit > 1e-6))
                 # Recheck: cases where deficit_after_bess > 0 and fc didn't cover
                 failed_no_fc = need_discharge & (deficit_after_bess > 1e-6)
@@ -204,12 +204,12 @@ def simulate_vectorized(pv_avail, load, elec_kw, fc_kw, h2_tank_kg,
                                 else:
                                     fail_reason[i] = "fuel_cell_power_limited"
 
-        # ═══ 富余处理 ═══
+        # Handle surplus generation.
         surplus = pv_now - pv_to_load
         can_charge = alive & (surplus > 0)
         if can_charge.any():
 
-            # Step 1: BESS充电
+            # Step 1: Charge the BESS.
             bess_remain_cap = np.maximum(0.0, (BESS_SOC_MAX - bess_soc) * BASE_BESS_ENERGY_KWH)
             bess_max_charge_input = bess_remain_cap / BESS_CHARGE_EFF
             bess_max_charge = np.minimum(BASE_BESS_POWER_KW, bess_max_charge_input)
@@ -218,7 +218,7 @@ def simulate_vectorized(pv_avail, load, elec_kw, fc_kw, h2_tank_kg,
             bess_soc = np.minimum(bess_soc, BESS_SOC_MAX)
             surplus_after_bess = surplus - bess_charge
 
-            # Step 2: 电解槽制氢
+            # Step 2: Produce hydrogen with the electrolyzer.
             can_electrolyze = can_charge & (surplus_after_bess > 1e-6) & (elec_kw > 0) & (h2_tank_kg > 0)
             if can_electrolyze.any():
                 h2_headroom = np.maximum(0.0, H2_SOC_MAX * h2_tank_kg - h2_kg)
@@ -235,7 +235,7 @@ def simulate_vectorized(pv_avail, load, elec_kw, fc_kw, h2_tank_kg,
 
 
 # ╔══════════════════════════════════════════════════════════════╗
-# ║                    图 形 绘 制                               ║
+#                       Plotting
 # ╚══════════════════════════════════════════════════════════════╝
 
 def plot_results(df, figures_folder):
@@ -244,11 +244,11 @@ def plot_results(df, figures_folder):
     cmap = plt.cm.plasma
     colors = [cmap(i / max(len(cons_vals) - 1, 1)) for i in range(len(cons_vals))]
 
-    # 去除撑满全年8760h的结果
+    # Exclude results that survive the full 8760-hour horizon from the plots.
     df_plot = df[df['min_offgrid_hours'] < 8760].copy()
-    print(f"  [绘图] 去除撑满全年配置后: {len(df_plot)} / {len(df)} 行")
+    print(f"  [Plot] After excluding configurations that survive the full year: {len(df_plot)} / {len(df)} rows")
 
-    # ── 图1: 6子图 ──
+    # Figure 1: Six panels
     fig, axes = plt.subplots(2, 3, figsize=(18, 10))
     axes_flat = axes.flatten()
     for i, ct in enumerate(cons_vals):
@@ -266,9 +266,9 @@ def plot_results(df, figures_folder):
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     fig.savefig(os.path.join(figures_folder, "offgrid_vs_energy_pen_6panels.png"), dpi=200)
     plt.close(fig)
-    print(f"  [图] offgrid_vs_energy_pen_6panels.png")
+    print(f"  [Figure] offgrid_vs_energy_pen_6panels.png")
 
-    # ── 图2: 综合曲线 ──
+    # Figure 2: Combined curves
     fig, ax = plt.subplots(figsize=(11, 7))
     for i, ct in enumerate(cons_vals):
         sub = df_plot[df_plot['cons_target_%'] == ct].sort_values('energy_pen_%')
@@ -285,9 +285,9 @@ def plot_results(df, figures_folder):
     fig.tight_layout()
     fig.savefig(os.path.join(figures_folder, "offgrid_vs_energy_pen_by_cons.png"), dpi=200)
     plt.close(fig)
-    print(f"  [图] offgrid_vs_energy_pen_by_cons.png")
+    print(f"  [Figure] offgrid_vs_energy_pen_by_cons.png")
 
-    # ── 图3: 离网时长 vs PV散点图 ──
+    # Figure 3: Off-grid duration vs PV capacity scatter plot
     fig, ax = plt.subplots(figsize=(10, 6))
     for i, ct in enumerate(cons_vals):
         sub = df_plot[df_plot['cons_target_%'] == ct]
@@ -301,28 +301,28 @@ def plot_results(df, figures_folder):
     fig.tight_layout()
     fig.savefig(os.path.join(figures_folder, "offgrid_vs_pv_by_cons.png"), dpi=200)
     plt.close(fig)
-    print(f"  [图] offgrid_vs_pv_by_cons.png")
+    print(f"  [Figure] offgrid_vs_pv_by_cons.png")
 
 
 # ╔══════════════════════════════════════════════════════════════╗
-# ║                      主 程 序                                ║
+#                       Main program
 # ╚══════════════════════════════════════════════════════════════╝
 
 def main():
     print("=" * 70)
-    print("  微网离网运行时长分析（氢储能版本）")
+    print("  Microgrid off-grid duration analysis (hydrogen storage)")
     print("=" * 70)
     start_time = datetime.datetime.now()
 
-    # ── 1. 读取数据 ──
+    # 1. Load data.
     pv_raw, load = load_8760_data()
     df_sens = load_sensitivity()
     n_hours = 8760
 
-    # ── 2. 断网起点 ──
+    # 2. Generate outage starting times.
     start_hours, start_days, start_hod = generate_start_info(n_hours)
 
-    # ── 3. 逐行仿真 ──
+    # 3. Simulate each configuration.
     results = {
         "min_offgrid_hours": [],
         "mean_offgrid_hours": [],
@@ -334,11 +334,11 @@ def main():
         "worst_failure_reason": [],
     }
 
-    for idx in tqdm(range(len(df_sens)), desc="仿真进度"):
+    for idx in tqdm(range(len(df_sens)), desc="Simulation progress"):
         row = df_sens.iloc[idx]
         pv_mw = row["PV_MW"]
         elec_kw = row["elec_cap_kW"]
-        fc_kw_val = row["fc_cap_kW"] + 1.0  # +1kW余量: 确保FC严格>峰值负荷, 避免浮点精度导致恰好差一点
+        fc_kw_val = row["fc_cap_kW"] + 1.0  # Add 1 kW so FC capacity strictly exceeds peak load, avoiding failures due to floating-point rounding.
         h2_tank = row["h2_tank_kg"]
 
         pv_avail = pv_raw * (pv_mw / PV_BASE_CAPACITY_MW)
@@ -364,40 +364,40 @@ def main():
         results["worst_start_hour"].append(int(start_hod[worst_idx]))
         results["worst_failure_reason"].append(str(reasons[worst_idx]))
 
-    # ── 4. 写回Excel ──
+    # 4. Write results back to Excel.
     for col, vals in results.items():
         df_sens[col] = vals
 
     backup_path = INPUT_SENSITIVITY.replace(".xlsx", "_backup.xlsx")
     if not os.path.exists(backup_path):
         shutil.copy2(INPUT_SENSITIVITY, backup_path)
-        print(f"\n[备份] 原文件已备份至: {backup_path}")
+        print(f"\n[Backup] Original file saved to: {backup_path}")
 
     with pd.ExcelWriter(INPUT_SENSITIVITY, engine="openpyxl") as writer:
         df_sens.to_excel(writer, sheet_name="Results", index=False)
-    print(f"\n[输出] 结果已写回: {INPUT_SENSITIVITY}")
+    print(f"\n[Output] Results written to: {INPUT_SENSITIVITY}")
 
-    # ── 5. 绘图 ──
-    print("\n[图表] 生成可视化 ...")
+    # 5. Plot results.
+    print("\n[Figures] Creating plots ...")
     plot_results(df_sens, FIGURES_FOLDER)
 
-    # ── 6. 摘要 ──
+    # 6. Summary
     elapsed = (datetime.datetime.now() - start_time).total_seconds()
     print(f"\n{'='*70}")
-    print(f"  运 行 摘 要")
+    print(f"  Run summary")
     print(f"{'='*70}")
-    print(f"  运行耗时: {elapsed:.0f} 秒 ({elapsed/60:.1f} 分钟)")
-    print(f"  配置总数: {len(df_sens)}")
-    print(f"  min_offgrid_hours 统计:")
-    print(f"    最小值: {df_sens['min_offgrid_hours'].min():.1f} h")
-    print(f"    最大值: {df_sens['min_offgrid_hours'].max():.1f} h ({df_sens['min_offgrid_hours'].max()/24:.1f} 天)")
-    print(f"    中位数: {df_sens['min_offgrid_hours'].median():.1f} h")
-    print(f"    均值:   {df_sens['min_offgrid_hours'].mean():.1f} h")
-    print(f"  能撑到年末: {(df_sens['survival_rate'] == 1.0).sum()} / {len(df_sens)}")
-    print(f"  失败原因分布:")
+    print(f"  Elapsed time: {elapsed:.0f} seconds ({elapsed/60:.1f} minutes)")
+    print(f"  Total configurations: {len(df_sens)}")
+    print(f"  min_offgrid_hours statistics:")
+    print(f"    Minimum: {df_sens['min_offgrid_hours'].min():.1f} h")
+    print(f"    Maximum: {df_sens['min_offgrid_hours'].max():.1f} h ({df_sens['min_offgrid_hours'].max()/24:.1f} days)")
+    print(f"    Median: {df_sens['min_offgrid_hours'].median():.1f} h")
+    print(f"    Mean:   {df_sens['min_offgrid_hours'].mean():.1f} h")
+    print(f"  Configurations surviving the full year: {(df_sens['survival_rate'] == 1.0).sum()} / {len(df_sens)}")
+    print(f"  Failure reason counts:")
     print(df_sens['worst_failure_reason'].value_counts().to_string())
     print(f"\n  Excel: {INPUT_SENSITIVITY}")
-    print(f"  图片: {FIGURES_FOLDER}/")
+    print(f"  Figures: {FIGURES_FOLDER}/")
     print(f"{'='*70}")
 
 

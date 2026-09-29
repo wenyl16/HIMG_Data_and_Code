@@ -1,11 +1,11 @@
 """
-风光储微电网 PV+Wind 容量扫描 + 电池储能容量优化 (单电池合并版)
-扫描风光总容量(Wind:PV=1000:835比例同步) × 消纳率目标(60%~100%) × 电池价格倍数
-单一电池储能: 总容量 E_TOTAL 为决策变量, 功率 = E_TOTAL / BAT_POWER_RATIO
-用绝对能量 E_bat(t) 跟踪SOC(全线性), 紧M充放电互斥(MILP)
-电池价格灵敏度(逐一独立变化BAT_PRICE_FACTORS)
-注: 本模型为并网自消纳(电网 slack 绝对可靠、无柴发/LPSP), 非离网孤岛模型
-目标: 最小化全系统年化总成本; 求解器 Gurobi
+Wind-PV-battery microgrid: PV + wind capacity scan and battery sizing (single merged battery)
+Scan total renewable capacity (Wind:PV = 1000:835), utilization targets (60%-100%), and battery price factors.
+Single battery: E_TOTAL is the capacity decision variable; power = E_TOTAL / BAT_POWER_RATIO.
+Track SOC using absolute energy E_bat(t) with linear constraints and tight big-M charge/discharge exclusion.
+Battery price sensitivity: evaluate each BAT_PRICE_FACTORS value independently.
+Note: this is a grid-connected self-consumption model with a perfectly reliable grid slack supply, no diesel generator or LPSP constraint.
+Objective: minimize total annualized system cost. Solver: Gurobi.
 """
 
 import os
@@ -18,35 +18,35 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # ============================================================
-# 1. 系统参数
+# 1. System parameters
 # ============================================================
 
-# --- 光伏 ---
+# PV
 PV_RATED_ORIGINAL = 835        # kW
 PV_CAPEX = 530                 # $/kW
 PV_LIFE = 25
 PV_OM_RATE = 0.015
 
-# --- 风机 ---
+# Wind turbines
 WIND_RATED_ORIGINAL = 1000     # kW
 WIND_CAPEX = 844              # $/kW
 WIND_LIFE = 30
 WIND_OM_RATE = 0.03
 
-# --- 风光容量扫描 (Wind:PV = 1000:835) ---
+# Wind and PV capacity scan (Wind:PV = 1000:835)
 RATIO_WIND = 1000 / 1835
 RATIO_PV = 835 / 1835
 RENEW_SCAN_MIN = 10          # kW
 RENEW_SCAN_MAX = 16000         # kW
 RENEW_SCAN_STEP = 100          # kW
 
-# --- 单一电池储能 ---
-E_BAT_MAX = 0                  # kWh —— Greenfield: 无原有电池下界, 从0优化
-BAT_POWER_RATIO = 2.25         # 能量:功率 = 2.25:1, 功率 = E_TOTAL / 2.25
+# Single battery storage system
+E_BAT_MAX = 0                  # kWh: greenfield planning, with no existing battery capacity lower bound.
+BAT_POWER_RATIO = 2.25         # Energy-to-power ratio = 2.25:1; power = E_TOTAL / 2.25.
 BAT_CAPEX = 250                # $/kWh
 BAT_LIFE = 8
 BAT_OM_RATE = 0.01
-BAT_PRICE_FACTORS = [1.0]              # Greenfield: 仅基准成本因子
+BAT_PRICE_FACTORS = [1.0]              # Greenfield: baseline cost factor only.
 
 ETA_CHARGE = 0.95
 ETA_DISCHARGE = 0.95
@@ -54,22 +54,22 @@ SOC_BAT_MIN = 0.1
 SOC_BAT_MAX = 0.9
 SOC_BAT_INIT = 0.5
 
-# --- 电价 (RMB/kWh, 使用时 /7 转 USD) --- 两段制, 无季节区分
-PRICE_PEAK   = 0.568 / 7    # 峰时段 8:00-22:00
-PRICE_VALLEY = 0.288 / 7    # 谷时段 22:00-次日8:00
+# Electricity price: RMB/kWh divided by 7 for USD; two periods, without seasonal variation.
+PRICE_PEAK   = 0.568 / 7    # Peak period: 08:00-22:00
+PRICE_VALLEY = 0.288 / 7    # Off-peak period: 22:00-08:00 the following day
 
-# --- 经济参数 ---
+# Economic parameters
 DISCOUNT_RATE = 0.05
 
-# --- 消纳率目标 ---
+# Renewable utilization targets
 CONSUMPTION_TARGETS = [0.6, 0.7, 0.8, 0.9, 1.0]
-CONSUMPTION_TOL = 0.0005       # 0.05%  (所有消纳率目标统一)
+CONSUMPTION_TOL = 0.0005       # 0.05% tolerance for all utilization targets
 
 T = 8760
 
 
 # ============================================================
-# 2. 工具函数
+# 2. Helper functions
 # ============================================================
 
 def crf(rate, years):
@@ -90,12 +90,12 @@ def load_raw_data(filepath=None):
 
 
 def build_prices():
-    # 两段制电价(无季节区分): 峰 8:00-22:00, 谷 22:00-次日8:00
+    # Two-period tariff, without seasonal variation: peak 08:00-22:00; off-peak 22:00-08:00.
     prices = []
     for i in range(T):
         h = i % 24
-        if 8 <= h < 22:                p = PRICE_PEAK     # 峰 (14h)
-        else:                          p = PRICE_VALLEY   # 谷 (10h)
+        if 8 <= h < 22:                p = PRICE_PEAK     # Peak (14 h)
+        else:                          p = PRICE_VALLEY   # Off-peak (10 h)
         prices.append(p)
     return prices
 
@@ -111,7 +111,7 @@ def scale_wind(wind_raw, wind_rated):
 
 
 # ============================================================
-# 3. 单场景 MILP 求解 (单一电池)
+# 3. Solve one scenario as a MILP (single battery).
 # ============================================================
 
 def solve_scenario(pv, wind, load, prices, pv_rated, wind_rated, consumption_target,
@@ -126,7 +126,7 @@ def solve_scenario(pv, wind, load, prices, pv_rated, wind_rated, consumption_tar
     if total_load == 0:
         return None
 
-    # 容量上界估计
+    # Estimate the capacity upper bound.
     total_surplus = sum(max(ren[t] - load[t], 0) for t in range(T))
     add_ub = max(1000, min(total_surplus * 0.5, max_ren * 8760 * 0.25))
     etotal_ub = E_BAT_MAX + add_ub
@@ -136,14 +136,14 @@ def solve_scenario(pv, wind, load, prices, pv_rated, wind_rated, consumption_tar
     model.setParam("TimeLimit", 300)
     mipgap = 0.005 if consumption_target < 0.8 else 0.02
     model.setParam("MIPGap", mipgap)
-    model.setParam("Threads", 1)   # 单线程确定性求解, 与并行版(_init_worker Threads=1)对齐, 保证串行==并行可复现
+    model.setParam("Threads", 1)   # Use one solver thread, matching parallel _init_worker Threads=1 for consistent serial/parallel runs.
 
     idx = range(T)
 
-    # ---- 电池总容量决策变量 ----
+    # Total battery capacity decision variable
     E_TOTAL = model.addVar(lb=E_BAT_MAX, ub=etotal_ub, name="E_TOTAL")
 
-    # ---- 逐小时运行变量 ----
+    # Hourly operating variables
     P_grid = model.addVars(idx, lb=0, name="P_grid")
     P_ren_load = model.addVars(idx, lb=0, name="P_ren_load")
     P_ren_curt = model.addVars(idx, lb=0, name="P_ren_curt")
@@ -155,7 +155,7 @@ def solve_scenario(pv, wind, load, prices, pv_rated, wind_rated, consumption_tar
     u_ch = model.addVars(idx, vtype=GRB.BINARY, name="u_ch")
     u_dis = model.addVars(idx, vtype=GRB.BINARY, name="u_dis")
 
-    # ---- 目标函数 ----
+    # Objective function
     crf_pv = crf(DISCOUNT_RATE, PV_LIFE)
     crf_wind = crf(DISCOUNT_RATE, WIND_LIFE)
     crf_bat = crf(DISCOUNT_RATE, BAT_LIFE)
@@ -168,24 +168,24 @@ def solve_scenario(pv, wind, load, prices, pv_rated, wind_rated, consumption_tar
 
     model.setObjective(cost_pv + cost_wind + cost_bat + cost_grid, GRB.MINIMIZE)
 
-    # ---- 约束条件 ----
+    # Constraints
     for t in idx:
-        # C1: 风光分配 (充电 + 直供负荷 + 弃电 = PV + Wind)
+        # C1: Renewable allocation: charging + direct load supply + curtailment = PV + wind.
         model.addConstr(
             P_bat_ch[t] + P_ren_load[t] + P_ren_curt[t] == ren[t],
             name=f"ren_alloc_{t}"
         )
 
-        # C2: 功率上限 (E_TOTAL / BAT_POWER_RATIO)
+        # C2: Power limit (E_TOTAL / BAT_POWER_RATIO)
         model.addConstr(P_bat_ch[t] <= E_TOTAL / BAT_POWER_RATIO, name=f"ch_lim_{t}")
         model.addConstr(P_bat_dis[t] <= E_TOTAL / BAT_POWER_RATIO, name=f"dis_lim_{t}")
 
-        # C3: 充放电互斥 (用逐小时紧M: P_ch≤ren[t], P_dis≤load[t])
+        # C3: Charge/discharge exclusion using hourly tight big-M values: P_ch <= ren[t], P_dis <= load[t].
         model.addConstr(P_bat_ch[t] <= ren[t] * u_ch[t], name=f"ch_{t}")
         model.addConstr(P_bat_dis[t] <= load[t] * u_dis[t], name=f"dis_{t}")
         model.addConstr(u_ch[t] + u_dis[t] <= 1, name=f"excl_{t}")
 
-        # C4: 能量动态 (绝对能量, 线性)
+        # C4: Energy dynamics using absolute energy (linear)
         if t == 0:
             model.addConstr(
                 E_bat[t] == SOC_BAT_INIT * E_TOTAL
@@ -199,29 +199,29 @@ def solve_scenario(pv, wind, load, prices, pv_rated, wind_rated, consumption_tar
                 name=f"e_{t}"
             )
 
-        # C5: 能量上下限
+        # C5: Energy limits
         model.addConstr(E_bat[t] >= SOC_BAT_MIN * E_TOTAL, name=f"e_lo_{t}")
         model.addConstr(E_bat[t] <= SOC_BAT_MAX * E_TOTAL, name=f"e_hi_{t}")
 
-        # C6: 负荷平衡
+        # C6: Load balance
         model.addConstr(
             load[t] == P_ren_load[t] + P_bat_dis[t] + P_grid[t],
             name=f"balance_{t}"
         )
 
-    # C7: 年末能量 = 初始
+    # C7: End-of-year energy equals initial energy.
     model.addConstr(E_bat[T - 1] == SOC_BAT_INIT * E_TOTAL, name="bat_final")
 
-    # C8: 消纳率约束
+    # C8: Renewable utilization constraints
     curtail_sum = gp.quicksum(P_ren_curt[t] for t in idx)
-    cons_tol = CONSUMPTION_TOL   # 所有消纳目标统一用 0.05%
+    cons_tol = CONSUMPTION_TOL   # Use a 0.05% tolerance for every utilization target.
     max_curtail = (1 - consumption_target + cons_tol) * total_ren
     min_curtail = max(0, (1 - consumption_target - cons_tol) * total_ren)
     model.addConstr(curtail_sum <= max_curtail, name="curt_hi")
     if consumption_target < 1.0:
         model.addConstr(curtail_sum >= min_curtail, name="curt_lo")
 
-    # ---- 求解 ----
+    # Solve the model.
     model.optimize()
 
     if model.status not in (GRB.OPTIMAL, GRB.TIME_LIMIT, GRB.SUBOPTIMAL):
@@ -229,7 +229,7 @@ def solve_scenario(pv, wind, load, prices, pv_rated, wind_rated, consumption_tar
     if model.SolCount == 0:
         return None
 
-    # ---- 提取结果 ----
+    # Extract results.
     e_total = E_TOTAL.X
     p_total = e_total / BAT_POWER_RATIO
 
@@ -263,7 +263,7 @@ def solve_scenario(pv, wind, load, prices, pv_rated, wind_rated, consumption_tar
 
 
 # ============================================================
-# 4. 结果保存
+# 4. Save results.
 # ============================================================
 
 def save_to_excel(results, filename=None):
@@ -300,18 +300,18 @@ def save_to_excel(results, filename=None):
 
     wb.save(filename)
     wb.close()
-    print(f"结果已保存到 {filename}")
+    print(f"Results saved to {filename}")
 
 
 # ============================================================
-# 5. 可视化
+# 5. Visualization
 # ============================================================
 
 def plot_results(results):
     colors = ["tab:blue", "tab:orange", "tab:green", "tab:red", "tab:purple", "tab:brown"]
     out_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # ---- 图1: 渗透率 vs LCOE (baseline) ----
+    # Figure 1: Penetration vs LCOE (baseline)
     base = [r for r in results if r["bat_price_factor"] == 1.0]
     fig1, ax1 = plt.subplots(figsize=(11, 7))
     for i, ct in enumerate(CONSUMPTION_TARGETS):
@@ -331,7 +331,7 @@ def plot_results(results):
     fig1.savefig(os.path.join(out_dir, "plot_wind_pv_bat_lcoe_vs_penetration.png"), dpi=150)
     plt.close(fig1)
 
-    # ---- 图2: 总可再生容量 vs LCOE (baseline) ----
+    # Figure 2: Total renewable capacity vs LCOE (baseline)
     fig2, ax2 = plt.subplots(figsize=(11, 7))
     for i, ct in enumerate(CONSUMPTION_TARGETS):
         ct_pct = ct * 100
@@ -349,7 +349,7 @@ def plot_results(results):
     fig2.savefig(os.path.join(out_dir, "plot_wind_pv_bat_lcoe_vs_capacity.png"), dpi=150)
     plt.close(fig2)
 
-    # ---- 图3: 价格灵敏度 (5子图=消纳率, 每子图4条倍数曲线) ----
+    # Figure 3: Price sensitivity; five utilization-target panels, each with four price-factor curves.
     factor_colors = {1.0: "tab:blue", 0.9: "tab:orange", 0.7: "tab:green", 0.5: "tab:red"}
     fig4, axes = plt.subplots(2, 3, figsize=(16, 9))
     flat = axes.flatten()
@@ -375,17 +375,17 @@ def plot_results(results):
     fig4.savefig(os.path.join(out_dir, "plot_wind_pv_bat_capacity_by_pricefactor.png"), dpi=150)
     plt.close(fig4)
 
-    print("图表已保存: plot_wind_pv_bat_lcoe_vs_penetration.png, "
+    print("Figures saved: plot_wind_pv_bat_lcoe_vs_penetration.png, "
           "plot_wind_pv_bat_lcoe_vs_capacity.png, "
           "plot_wind_pv_bat_capacity_by_pricefactor.png")
 
 
 # ============================================================
-# 6. 主程序
+# 6. Main program
 # ============================================================
 
 if __name__ == "__main__":
-    print("正在读取数据...")
+    print("Reading data...")
     pv_raw, wind_raw, load_data = load_raw_data()
     prices = build_prices()
 
@@ -400,10 +400,10 @@ if __name__ == "__main__":
     n_ok = 0
     t_start = time.time()
 
-    print(f"扫描(单电池): {n_ren} 风光容量 × {n_ct} 消纳率 × {n_pf} 价格倍数 = {n_total} 场景")
-    print(f"风光总容量: {RENEW_SCAN_MIN/1000:.3f}~{RENEW_SCAN_MAX/1000:.1f} MW, "
-          f"步长 {RENEW_SCAN_STEP/1000:.1f} MW, Wind:PV = 1000:835")
-    print(f"电池价格倍数: {BAT_PRICE_FACTORS}")
+    print(f"Scan (single battery): {n_ren} renewable capacities x {n_ct} utilization targets x {n_pf} price factors = {n_total} scenarios")
+    print(f"Total renewable capacity: {RENEW_SCAN_MIN/1000:.3f}~{RENEW_SCAN_MAX/1000:.1f} MW, "
+          f"step {RENEW_SCAN_STEP/1000:.1f} MW, Wind:PV = 1000:835")
+    print(f"Battery price factors: {BAT_PRICE_FACTORS}")
     print()
 
     for factor in BAT_PRICE_FACTORS:
@@ -419,8 +419,8 @@ if __name__ == "__main__":
                     elapsed = time.time() - t_start
                     rate = n_done / elapsed if elapsed > 0 else 0
                     eta = (n_total - n_done) / rate if rate > 0 else 0
-                    print(f"  进度 {n_done}/{n_total} ({n_done/n_total*100:.0f}%)  "
-                          f"可行 {n_ok}  已用 {elapsed:.0f}s  剩余 ~{eta:.0f}s")
+                    print(f"  Progress {n_done}/{n_total} ({n_done/n_total*100:.0f}%)  "
+                          f"feasible {n_ok}  elapsed {elapsed:.0f}s  remaining ~{eta:.0f}s")
 
                 r = solve_scenario(pv, wind, load_data, prices, pv_kw, wind_kw, ct,
                                    bat_price_factor=factor)
@@ -429,7 +429,7 @@ if __name__ == "__main__":
                     n_ok += 1
 
     elapsed = time.time() - t_start
-    print(f"\n扫描完成: {n_ok}/{n_total} 可行, 耗时 {elapsed:.1f}s")
+    print(f"\nScan complete: {n_ok}/{n_total} feasible, elapsed {elapsed:.1f}s")
 
     all_results.sort(key=lambda r: (r["bat_price_factor"], r["Total_Renewable_MW"], r["cons_target_pct"]))
 
@@ -437,4 +437,4 @@ if __name__ == "__main__":
         save_to_excel(all_results)
         plot_results(all_results)
     else:
-        print("无可行解, 请检查参数设置")
+        print("No feasible solution; check the parameters")

@@ -1,4 +1,4 @@
-﻿场景,消纳率目标(%),增长起点能量渗透率(%),曲率最大_能量渗透率(%),曲率最大_储能时长(h)
+﻿scenario,consumption_target_%,growth_start_penetration_%,maximum_curvature_penetration_%,maximum_curvature_duration_h
 Norway,60,77.59,79.98285859152637,31.610419289796283
 Norway,70,73.15,76.14328200053076,30.90014904286269
 Norway,80,65.87,74.91762095507039,41.76557293176803

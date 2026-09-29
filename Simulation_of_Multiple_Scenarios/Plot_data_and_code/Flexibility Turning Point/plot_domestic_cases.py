@@ -323,10 +323,10 @@ def find_first_prominent_curvature_peak(
     """Return the leftmost prominent curvature peak in the growth region."""
     prepared = prepare_method_interval(x, y, growth_start_x)
     empty_info = {
-        '明显曲率峰数量': 0,
-        '有效明显曲率峰数量': 0,
-        '曲率峰储能时长下限(h)': np.nan,
-        '是否回退到最大曲率': False,
+        'prominent_curvature_peak_count': 0,
+        'eligible_prominent_curvature_peak_count': 0,
+        'curvature_peak_min_duration_h': np.nan,
+        'used_maximum_curvature_fallback': False,
     }
     if prepared is None:
         return (None, None, empty_info) if return_info else (None, None)
@@ -401,17 +401,17 @@ def find_first_prominent_curvature_peak(
         eligible = candidates[locally_rising(candidates)]
         if not len(eligible):
             info = dict(empty_info)
-            info['明显曲率峰数量'] = int(len(peaks))
-            info['曲率峰储能时长下限(h)'] = min_peak_y
+            info['prominent_curvature_peak_count'] = int(len(peaks))
+            info['curvature_peak_min_duration_h'] = min_peak_y
             return (None, None, info) if return_info else (None, None)
         idx = int(eligible[np.argmax(curvature[eligible])])
         used_fallback = True
 
     info = {
-        '明显曲率峰数量': int(len(peaks)),
-        '有效明显曲率峰数量': int(len(valid_peaks)),
-        '曲率峰储能时长下限(h)': min_peak_y,
-        '是否回退到最大曲率': used_fallback,
+        'prominent_curvature_peak_count': int(len(peaks)),
+        'eligible_prominent_curvature_peak_count': int(len(valid_peaks)),
+        'curvature_peak_min_duration_h': min_peak_y,
+        'used_maximum_curvature_fallback': used_fallback,
     }
     point = (float(x[idx]), float(y[idx]))
     return (*point, info) if return_info else point
@@ -487,9 +487,6 @@ for scenario, cfg in SCENARIOS:
     # the original total battery energy and scenario-specific reference power.
     if 'storage_duration_h' in df.columns:
         duration_source = 'storage_duration_h'
-        duration_divisor = 1.0
-    elif '小时数' in df.columns:
-        duration_source = '小时数'
         duration_divisor = 1.0
     elif 'total_batt_MWh' in df.columns:
         duration_source = 'total_batt_MWh'

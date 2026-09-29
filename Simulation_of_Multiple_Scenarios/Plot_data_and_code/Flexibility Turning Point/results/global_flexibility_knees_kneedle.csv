@@ -1,4 +1,4 @@
-﻿场景,消纳率目标(%),增长起点能量渗透率(%),kneedle_能量渗透率(%),kneedle_储能时长(h)
+﻿scenario,consumption_target_%,growth_start_penetration_%,kneedle_penetration_%,kneedle_duration_h
 Norway,60,47.58393810388107,79.67682274247493,30.71187057395529
 Norway,70,42.42670036805656,78.06260869565217,36.87664037603382
 Norway,80,36.96938586230734,76.38896321070234,46.34704498576705

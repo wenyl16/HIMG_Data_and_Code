@@ -1,17 +1,17 @@
 """
-Norway(Rye) 微网 风光储 电池容量优化(参考海岛 microgrid_wind_pv_bat_sizing_scan.py)
+Norway (Rye) wind-PV-battery microgrid sizing, based on Island microgrid_wind_pv_bat_sizing_scan.py
 ======================================================================================
-数据: Norway.xlsx(pv_production / wind_production / consumption / spot_market_price[NOK/kWh])
-系统: 风电+光伏(按实测配比 wind:PV=225:80 联合扫描) + 单一电池(E_TOTAL 决策变量, 功率=E/2)
-成本: 现货价 NOK/kWh -> USD/kWh (PRICE_NOK_TO_USD); CAPEX 已是 USD
-成本因子: 仅 1.0; 消纳率: 60~100%
-目标: 最小化年化总成本; 求解器 Gurobi
+Data: Norway.xlsx (pv_production / wind_production / consumption / spot_market_price [NOK/kWh]).
+System: wind and PV scanned together at their measured 225:80 ratio, plus one battery (E_TOTAL decision variable; power=E/2).
+Costs: convert spot prices from NOK/kWh to USD/kWh using PRICE_NOK_TO_USD; CAPEX is already in USD.
+Cost factor: 1.0 only. Renewable utilization targets: 60%-100%.
+Objective: minimize total annualized cost. Solver: Gurobi.
 
-与原 microgrid_bat_sizing_scan.py 的差别:
-  1. 读入 wind_production 列, 新增 scale_wind + 风电 CAPEX
-  2. 风光联合扫描(以风光总容量为参数, Wind:PV=225:80 同步), 替代原纯 PV 扫描
-  3. 可再生 ren=PV+Wind 合并参与平衡/弃电/消纳率; 电池可用风光富余充电
-  4. 现货价乘汇率折 USD, 与 CAPEX 单位一致
+Differences from the original microgrid_bat_sizing_scan.py:
+  1. Read wind_production; add scale_wind and wind CAPEX.
+  2. Scan total wind-PV capacity at a fixed 225:80 ratio, replacing the PV-only scan.
+  3. Use ren=PV+wind in balance, curtailment, and utilization constraints; charge the battery from either source.
+  4. Convert spot prices to USD to match CAPEX units.
 """
 
 import os
@@ -26,39 +26,39 @@ import numpy as np
 from scipy.interpolate import PchipInterpolator
 
 # ============================================================
-# 1. 系统参数
+# 1. System parameters
 # ============================================================
 
-# --- 光伏 ---
-PV_RATED_ORIGINAL = 80          # kW (Norway PV 实测峰值~80kW)
+# PV
+PV_RATED_ORIGINAL = 80          # kW: Norway measured PV peak, approximately 80 kW.
 PV_CAPEX = 683                  # $/kW
 PV_LIFE = 25
 PV_OM_RATE = 0.015
 
-# --- 风电 (新增, 默认沿用海岛) ---
-WIND_RATED_ORIGINAL = 225       # kW (= wind_production 实测峰值)
+# Wind power: added using Island defaults.
+WIND_RATED_ORIGINAL = 225       # kW: measured peak of wind_production.
 WIND_CAPEX = 1616               # $/kW
 WIND_LIFE = 30
 WIND_OM_RATE = 0.03
 
-# --- 风光联合扫描 (实测配比 wind:PV = 225:80; 以风光总容量为参数, 与 Norway H2/海岛统一) ---
-RATIO_WIND = 225 / (225 + 80)   # 0.7377  wind = 总 × 0.7377
-RATIO_PV   = 80  / (225 + 80)   # 0.2623  PV  = 总 × 0.2623
-RENEW_SCAN_MIN = 2              # 风光总容量(=PV+Wind)下限 kW(greenfield 从零建, 低下限)
-RENEW_SCAN_MAX = 800            # 与 Norway H2 一致
-RENEW_SCAN_STEP = 5             # 与 Norway H2 一致
+# Joint wind-PV scan at the measured 225:80 ratio, parameterized by total capacity as in Norway H2 and Island.
+RATIO_WIND = 225 / (225 + 80)   # 0.7377: wind = total capacity x 0.7377.
+RATIO_PV   = 80  / (225 + 80)   # 0.2623: PV = total capacity x 0.2623.
+RENEW_SCAN_MIN = 2              # Lower bound of total wind-PV capacity in kW; low starting point for greenfield planning.
+RENEW_SCAN_MAX = 800            # Match Norway H2.
+RENEW_SCAN_STEP = 5             # Match Norway H2.
 
-# --- 电价: NOK/kWh -> USD/kWh ---
-PRICE_NOK_TO_USD = 0.11         # 2020 NOK→USD 汇率, 可调
+# Electricity price conversion: NOK/kWh -> USD/kWh
+PRICE_NOK_TO_USD = 0.11         # Adjustable 2020 NOK-to-USD exchange rate
 
-# --- 单一电池储能(沿用原 Norway) ---
-E_BAT_MAX = 0                   # kWh 总容量下界(0=无下界)
-BAT_POWER_RATIO = 2             # 能量:功率 = 2:1
+# Single battery storage, retaining the original Norway setup.
+E_BAT_MAX = 0                   # kWh: total capacity lower bound; 0 removes the existing-capacity floor.
+BAT_POWER_RATIO = 2             # Energy-to-power ratio = 2:1.
 BAT_CAPEX = 350                 # $/kWh
 BAT_LIFE = 8
 BAT_OM_RATE = 0.01
 
-BAT_PRICE_FACTORS = [1.0]       # 仅成本因子1.0
+BAT_PRICE_FACTORS = [1.0]       # Cost factor 1.0 only.
 
 ETA_CHARGE = 0.95
 ETA_DISCHARGE = 0.95
@@ -66,15 +66,15 @@ SOC_BAT_MIN = 0.1
 SOC_BAT_MAX = 0.9
 SOC_BAT_INIT = 0.5
 
-# --- 经济参数 ---
+# Economic parameters
 DISCOUNT_RATE = 0.05
 
-# --- 消纳率目标 ---
+# Renewable utilization targets
 CONSUMPTION_TARGETS = [0.6, 0.7, 0.8, 0.9, 1.0]
-CONSUMPTION_TOL = 0.0005       # 0.05%  (所有消纳率目标统一)
+CONSUMPTION_TOL = 0.0005       # 0.05% tolerance for all utilization targets
 
 # ============================================================
-# 2. 工具函数
+# 2. Helper functions
 # ============================================================
 
 def crf(rate, years):
@@ -84,7 +84,7 @@ def crf(rate, years):
 
 
 def load_raw_data(filepath=None):
-    """读 Norway.xlsx: pv_production / wind_production / consumption / spot_market_price"""
+    """Read Norway.xlsx: pv_production, wind_production, consumption, and spot_market_price."""
     if filepath is None:
         filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Norway.xlsx")
     wb = openpyxl.load_workbook(filepath, read_only=True)
@@ -92,25 +92,25 @@ def load_raw_data(filepath=None):
     rows = list(ws.iter_rows(min_row=2, values_only=True))
     wb.close()
 
-    # 注: wind_production 含大量负值(待机/坏点, 含2个-585kW异常), 钳位到>=0;
-    #     否则 ren=pv+wind<0 会使 "非负变量之和==ren" 约束不可行. PV 一并兜底.
+    # wind_production contains negative standby/bad-data values, including two -585 kW outliers; clip to zero.
+    # Otherwise ren=pv+wind<0 makes the sum of nonnegative allocation variables infeasible; also clip PV.
     pv_raw = [max(0.0, float(r[1])) for r in rows if r[1] is not None]
     wind_raw = [max(0.0, float(r[2])) for r in rows if r[2] is not None]
     load = [float(r[3]) for r in rows if r[3] is not None]
     prices = [float(r[4]) for r in rows if r[4] is not None]
 
-    # 截取前8760h(2020全年)
+    # Retain the first 8760 hours of the 2020 data.
     T = min(8760, len(pv_raw), len(wind_raw), len(load), len(prices))
     pv_raw = pv_raw[:T]
     wind_raw = wind_raw[:T]
     load = load[:T]
     prices = prices[:T]
 
-    print(f"  PV: 峰值={max(pv_raw):.1f}kW, 年发电={sum(pv_raw):.0f}kWh")
-    print(f"  Wind: 峰值={max(wind_raw):.1f}kW, 年发电={sum(wind_raw):.0f}kWh")
-    print(f"  Load: 峰值={max(load):.1f}kW, 年耗电={sum(load):.0f}kWh")
-    print(f"  Price(NOK/kWh): {min(prices):.4f}~{max(prices):.4f}, 均值={sum(prices)/len(prices):.4f}")
-    print(f"  数据长度: {T}h")
+    print(f"  PV: peak={max(pv_raw):.1f}kW, annual generation={sum(pv_raw):.0f}kWh")
+    print(f"  Wind: peak={max(wind_raw):.1f}kW, annual generation={sum(wind_raw):.0f}kWh")
+    print(f"  Load: peak={max(load):.1f}kW, annual consumption={sum(load):.0f}kWh")
+    print(f"  Price(NOK/kWh): {min(prices):.4f}~{max(prices):.4f}, mean={sum(prices)/len(prices):.4f}")
+    print(f"  Data length: {T}h")
     return pv_raw, wind_raw, load, prices
 
 
@@ -125,7 +125,7 @@ def scale_wind(wind_raw, wind_rated):
 
 
 # ============================================================
-# 3. 单场景 MILP 求解(风光储, 模型对齐海岛)
+# 3. Solve one wind-PV-battery MILP, aligned with the Island model.
 # ============================================================
 
 def solve_scenario(pv, wind, load, prices, pv_rated, wind_rated,
@@ -150,7 +150,7 @@ def solve_scenario(pv, wind, load, prices, pv_rated, wind_rated,
     model.setParam("TimeLimit", 300)
     mipgap = 0.005 if consumption_target < 0.8 else 0.02
     model.setParam("MIPGap", mipgap)
-    model.setParam("Threads", 1)   # 单线程确定性求解, 与并行版对齐, 保证串行==并行可复现
+    model.setParam("Threads", 1)   # Use one solver thread, matching the parallel version for consistent serial/parallel runs.
 
     idx = range(T)
 
@@ -199,7 +199,7 @@ def solve_scenario(pv, wind, load, prices, pv_rated, wind_rated,
     model.addConstr(E_bat[T - 1] == SOC_BAT_INIT * E_TOTAL, name="bat_final")
 
     curtail_sum = gp.quicksum(P_ren_curt[t] for t in idx)
-    cons_tol = CONSUMPTION_TOL   # 所有消纳目标统一用 0.05%
+    cons_tol = CONSUMPTION_TOL   # Use a 0.05% tolerance for every utilization target.
     max_curtail = (1 - consumption_target + cons_tol) * total_ren
     min_curtail = max(0, (1 - consumption_target - cons_tol) * total_ren)
     model.addConstr(curtail_sum <= max_curtail, name="curt_hi")
@@ -246,7 +246,7 @@ def solve_scenario(pv, wind, load, prices, pv_rated, wind_rated,
 
 
 # ============================================================
-# 4. 结果保存
+# 4. Save results.
 # ============================================================
 
 def save_to_excel(results, filename=None):
@@ -282,18 +282,18 @@ def save_to_excel(results, filename=None):
         ws.column_dimensions[col[0].column_letter].width = max_len + 2
 
     wb.save(filename)
-    print(f"结果已保存到 {filename}")
+    print(f"Results saved to {filename}")
 
 
 # ============================================================
-# 5. 可视化
+# 5. Visualization
 # ============================================================
 
 def plot_results(results, avg_load_mw=None):
     colors = ["tab:blue", "tab:orange", "tab:green", "tab:red", "tab:purple"]
     out_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # 图1: LCOE vs 渗透率
+    # Figure 1: LCOE vs penetration
     fig1, ax1 = plt.subplots(figsize=(11, 7))
     for i, ct in enumerate(CONSUMPTION_TARGETS):
         ct_pct = ct * 100
@@ -310,7 +310,7 @@ def plot_results(results, avg_load_mw=None):
     fig1.savefig(os.path.join(out_dir, "plot_lcoe_vs_penetration.png"), dpi=150)
     plt.close(fig1)
 
-    # 图2: 风光总容量 vs LCOE
+    # Figure 2: Total wind-PV capacity vs LCOE
     fig2, ax2 = plt.subplots(figsize=(11, 7))
     for i, ct in enumerate(CONSUMPTION_TARGETS):
         ct_pct = ct * 100
@@ -327,7 +327,7 @@ def plot_results(results, avg_load_mw=None):
     fig2.savefig(os.path.join(out_dir, "plot_lcoe_vs_renewable.png"), dpi=150)
     plt.close(fig2)
 
-    # 图3: 风光总容量 vs 电池容量
+    # Figure 3: Total wind-PV capacity vs battery capacity
     fig3, ax3 = plt.subplots(figsize=(11, 7))
     for i, ct in enumerate(CONSUMPTION_TARGETS):
         ct_pct = ct * 100
@@ -344,7 +344,7 @@ def plot_results(results, avg_load_mw=None):
     fig3.savefig(os.path.join(out_dir, "plot_bat_capacity_vs_renewable.png"), dpi=150)
     plt.close(fig3)
 
-    # 图4: 电池容量 vs 渗透率
+    # Figure 4: Battery capacity vs penetration
     fig4, ax4 = plt.subplots(figsize=(11, 7))
     for i, ct in enumerate(CONSUMPTION_TARGETS):
         ct_pct = ct * 100
@@ -364,7 +364,7 @@ def plot_results(results, avg_load_mw=None):
     saved = ["plot_lcoe_vs_penetration.png", "plot_lcoe_vs_renewable.png",
              "plot_bat_capacity_vs_renewable.png", "plot_capacity_vs_penetration.png"]
 
-    # 图5: 储能时长 vs 渗透率 (储能容量 MWh / 平均负荷 MW = h); 无数据点, PCHIP 平滑
+    # Figure 5: Storage duration vs penetration (capacity in MWh / mean load in MW = h); PCHIP curves without markers.
     if avg_load_mw and avg_load_mw > 0:
         fig5, ax5 = plt.subplots(figsize=(11, 7))
         for i, ct in enumerate(CONSUMPTION_TARGETS):
@@ -373,7 +373,7 @@ def plot_results(results, avg_load_mw=None):
                           for r in results if r["cons_target_pct"] == ct_pct])
             if not pts:
                 continue
-            # 聚合同一渗透率的多个点(均值), 保证 x 严格递增
+            # Average points with duplicate penetration values to ensure strictly increasing x.
             agg = {}
             for x, y in pts:
                 agg.setdefault(x, []).append(y)
@@ -397,18 +397,18 @@ def plot_results(results, avg_load_mw=None):
         plt.close(fig5)
         saved.append("plot_duration_vs_penetration.png")
 
-    print("图表已保存: " + ", ".join(saved))
+    print("Figures saved: " + ", ".join(saved))
 
 
 # ============================================================
-# 6. 主程序
+# 6. Main program
 # ============================================================
 
 if __name__ == "__main__":
-    print("正在读取 Norway 数据...")
+    print("Reading Norway data...")
     pv_raw, wind_raw, load_data, price_data = load_raw_data()
     T = len(pv_raw)
-    avg_load_mw = sum(load_data) / len(load_data) / 1000   # 平均负荷(MW), 用于储能时长换算
+    avg_load_mw = sum(load_data) / len(load_data) / 1000   # Mean load in MW for converting storage capacity to duration.
 
     renew_values = list(range(RENEW_SCAN_MIN, RENEW_SCAN_MAX + RENEW_SCAN_STEP, RENEW_SCAN_STEP))
     n_ren = len(renew_values)
@@ -421,8 +421,8 @@ if __name__ == "__main__":
     n_ok = 0
     t_start = time.time()
 
-    print(f"扫描(Norway 风光储): {n_ren} 风光容量档 × {n_ct} 消纳率 × {n_pf} 成本因子 = {n_total} 场景")
-    print(f"风光总容量: {RENEW_SCAN_MIN}~{RENEW_SCAN_MAX} kW, 步长 {RENEW_SCAN_STEP} kW, Wind:PV = 225:80")
+    print(f"Scan (Norway wind + PV + battery): {n_ren} renewable capacity levels x {n_ct} utilization targets x {n_pf} cost factors = {n_total} scenarios")
+    print(f"Total renewable capacity: {RENEW_SCAN_MIN}~{RENEW_SCAN_MAX} kW, step {RENEW_SCAN_STEP} kW, Wind:PV = 225:80")
     print()
 
     for factor in BAT_PRICE_FACTORS:
@@ -438,8 +438,8 @@ if __name__ == "__main__":
                     elapsed = time.time() - t_start
                     rate = n_done / elapsed if elapsed > 0 else 0
                     eta = (n_total - n_done) / rate if rate > 0 else 0
-                    print(f"  进度 {n_done}/{n_total} ({n_done/n_total*100:.0f}%)  "
-                          f"可行 {n_ok}  已用 {elapsed:.0f}s  剩余 ~{eta:.0f}s")
+                    print(f"  Progress {n_done}/{n_total} ({n_done/n_total*100:.0f}%)  "
+                          f"feasible {n_ok}  elapsed {elapsed:.0f}s  remaining ~{eta:.0f}s")
 
                 r = solve_scenario(pv, wind, load_data, price_data, pv_kw, wind_kw, ct, bat_price_factor=factor)
                 if r is not None:
@@ -447,10 +447,10 @@ if __name__ == "__main__":
                     n_ok += 1
 
     elapsed = time.time() - t_start
-    print(f"\n扫描完成: {n_ok}/{n_total} 可行, 耗时 {elapsed:.1f}s")
+    print(f"\nScan complete: {n_ok}/{n_total} feasible, elapsed {elapsed:.1f}s")
 
     if all_results:
         save_to_excel(all_results)
         plot_results(all_results, avg_load_mw=avg_load_mw)
     else:
-        print("无可行解, 请检查参数设置")
+        print("No feasible solution; check the parameters")

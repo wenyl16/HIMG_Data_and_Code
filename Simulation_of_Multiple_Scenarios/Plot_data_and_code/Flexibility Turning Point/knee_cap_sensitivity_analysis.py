@@ -54,28 +54,28 @@ plt.rcParams.update({
 
 # ═══ Configuration ═══
 SCENARIOS = [
-    ('乡村', {
+    ('Rural', {
         'path': os.path.join(DATA_DIR, 'rural', 'battery.xlsx'),
         'divisor': 0.1526255708, 'x_cap': None,
     }),
-    ('商业', {
+    ('Commercial', {
         'path': os.path.join(DATA_DIR, 'commercial', 'battery.xlsx'),
         'divisor': 1.33869863, 'x_cap': None,
     }),
-    ('工业', {
+    ('Industrial', {
         'path': os.path.join(DATA_DIR, 'industrial', 'battery.xlsx'),
         'divisor': 0.7547945205, 'x_cap': None,
     }),
-    ('海岛', {
+    ('Island', {
         'path': os.path.join(DATA_DIR, 'island', 'battery.xlsx'),
         'divisor': 0.7324200913, 'x_cap': 100.0,
     }),
 ]
 SCENARIO_SLUGS = {
-    '乡村': 'rural',
-    '商业': 'commercial',
-    '工业': 'industrial',
-    '海岛': 'island',
+    'Rural': 'rural',
+    'Commercial': 'commercial',
+    'Industrial': 'industrial',
+    'Island': 'island',
 }
 
 COLOR_MAP = {
@@ -90,13 +90,13 @@ PANEL_LABELS = ['a', 'b', 'c', 'd']
 Y_CAPS = (150, 200, 250)
 Y_CAP = int(ARGS.y_cap) if ARGS.y_cap is not None else None
 KNEE_METHODS = [
-    '曲率最大',
+    'maximum_curvature',
     'kneedle',
     'L_method',
 ]
 KNEE_METHOD_STYLES = {
     'kneedle': {'marker': '^', 'markersize': 4.5},
-    '曲率最大': {'marker': 'o', 'markersize': 4.2},
+    'maximum_curvature': {'marker': 'o', 'markersize': 4.2},
     'L_method': {'marker': 's', 'markersize': 4.0},
 }
 KNEE_RESULTS_CSV = (
@@ -291,10 +291,10 @@ def find_first_prominent_curvature_peak(
     """Return the leftmost prominent curvature peak in the growth region."""
     prepared = prepare_method_interval(x, y, growth_start_x)
     empty_info = {
-        '明显曲率峰数量': 0,
-        '有效明显曲率峰数量': 0,
-        '曲率峰储能时长下限(h)': np.nan,
-        '是否回退到最大曲率': False,
+        'prominent_curvature_peak_count': 0,
+        'eligible_prominent_curvature_peak_count': 0,
+        'curvature_peak_min_duration_h': np.nan,
+        'used_maximum_curvature_fallback': False,
     }
     if prepared is None:
         return (None, None, empty_info) if return_info else (None, None)
@@ -366,17 +366,17 @@ def find_first_prominent_curvature_peak(
         eligible = candidates[locally_rising(candidates)]
         if not len(eligible):
             info = dict(empty_info)
-            info['明显曲率峰数量'] = int(len(peaks))
-            info['曲率峰储能时长下限(h)'] = min_peak_y
+            info['prominent_curvature_peak_count'] = int(len(peaks))
+            info['curvature_peak_min_duration_h'] = min_peak_y
             return (None, None, info) if return_info else (None, None)
         idx = int(eligible[np.argmax(curvature[eligible])])
         used_fallback = True
 
     info = {
-        '明显曲率峰数量': int(len(peaks)),
-        '有效明显曲率峰数量': int(len(valid_peaks)),
-        '曲率峰储能时长下限(h)': min_peak_y,
-        '是否回退到最大曲率': used_fallback,
+        'prominent_curvature_peak_count': int(len(peaks)),
+        'eligible_prominent_curvature_peak_count': int(len(valid_peaks)),
+        'curvature_peak_min_duration_h': min_peak_y,
+        'used_maximum_curvature_fallback': used_fallback,
     }
     point = (float(x[idx]), float(y[idx]))
     return (*point, info) if return_info else point
@@ -423,7 +423,7 @@ def run_all_caps():
     case_frames = []
     case_files = []
     for y_cap in Y_CAPS:
-        print(f'\n{"=" * 18} 运行 Y 轴上限 {y_cap} h {"=" * 18}')
+        print(f'\n{"=" * 18} Running storage-duration cap {y_cap} h {"=" * 18}')
         subprocess.run(
             [sys.executable, '-X', 'utf8', script_path,
              '--y-cap', str(y_cap)],
@@ -440,35 +440,35 @@ def run_all_caps():
     for _, row in all_results.iterrows():
         for method in KNEE_METHODS:
             sensitivity_rows.append({
-                'Y轴上限(h)': row['Y轴上限(h)'],
-                '场景': row['场景'],
-                '消纳率目标(%)': row['消纳率目标(%)'],
-                '方法': method,
-                '肘点能量渗透率(%)': row[f'{method}_能量渗透率(%)'],
-                '肘点储能时长(h)': row[f'{method}_储能时长(h)'],
+                'duration_cap_h': row['duration_cap_h'],
+                'scenario': row['scenario'],
+                'consumption_target_%': row['consumption_target_%'],
+                'method': method,
+                'turning_point_penetration_%': row[f'{method}_penetration_%'],
+                'turning_point_duration_h': row[f'{method}_duration_h'],
             })
     sensitivity_long = pd.DataFrame(sensitivity_rows)
     point_pivot = sensitivity_long.pivot(
-        index=['场景', '消纳率目标(%)', '方法'],
-        columns='Y轴上限(h)',
-        values='肘点能量渗透率(%)',
+        index=['scenario', 'consumption_target_%', 'method'],
+        columns='duration_cap_h',
+        values='turning_point_penetration_%',
     ).reset_index()
     point_pivot.columns.name = None
     point_pivot = point_pivot.rename(
-        columns={cap: f'Y上限{cap}h_肘点渗透率(%)' for cap in Y_CAPS})
-    cap_columns = [f'Y上限{cap}h_肘点渗透率(%)' for cap in Y_CAPS]
-    point_pivot['最大漂移(百分点)'] = (
+        columns={cap: f'cap_{cap}h_penetration_%' for cap in Y_CAPS})
+    cap_columns = [f'cap_{cap}h_penetration_%' for cap in Y_CAPS]
+    point_pivot['max_shift_pp'] = (
         point_pivot[cap_columns].max(axis=1)
         - point_pivot[cap_columns].min(axis=1)
     )
     cap_1, cap_2, cap_3 = Y_CAPS
-    point_pivot[f'{cap_1}至{cap_2}h变化(百分点)'] = (
-        point_pivot[f'Y上限{cap_2}h_肘点渗透率(%)']
-        - point_pivot[f'Y上限{cap_1}h_肘点渗透率(%)']
+    point_pivot[f'cap_{cap_1}_to_{cap_2}h_change_pp'] = (
+        point_pivot[f'cap_{cap_2}h_penetration_%']
+        - point_pivot[f'cap_{cap_1}h_penetration_%']
     )
-    point_pivot[f'{cap_2}至{cap_3}h变化(百分点)'] = (
-        point_pivot[f'Y上限{cap_3}h_肘点渗透率(%)']
-        - point_pivot[f'Y上限{cap_2}h_肘点渗透率(%)']
+    point_pivot[f'cap_{cap_2}_to_{cap_3}h_change_pp'] = (
+        point_pivot[f'cap_{cap_3}h_penetration_%']
+        - point_pivot[f'cap_{cap_2}h_penetration_%']
     )
     detailed_output = os.path.join(
         RESULT_DIR, 'cap_sensitivity_all_results.csv')
@@ -483,23 +483,23 @@ def run_all_caps():
 
     method_styles = {
         'kneedle': {'marker': '^', 'linestyle': '-'},
-        '曲率最大': {'marker': 'o', 'linestyle': '--'},
+        'maximum_curvature': {'marker': 'o', 'linestyle': '--'},
         'L_method': {'marker': 's', 'linestyle': ':'},
     }
     fig, axes = plt.subplots(2, 2, figsize=(7.2, 5.6), sharex=True)
     for ax, scenario in zip(axes.flat, [item[0] for item in SCENARIOS]):
         scenario_data = sensitivity_long[
-            sensitivity_long['场景'].eq(scenario)]
-        for target in sorted(scenario_data['消纳率目标(%)'].unique()):
+            sensitivity_long['scenario'].eq(scenario)]
+        for target in sorted(scenario_data['consumption_target_%'].unique()):
             for method in KNEE_METHODS:
                 line_data = scenario_data[
-                    scenario_data['消纳率目标(%)'].eq(target)
-                    & scenario_data['方法'].eq(method)
-                ].sort_values('Y轴上限(h)')
+                    scenario_data['consumption_target_%'].eq(target)
+                    & scenario_data['method'].eq(method)
+                ].sort_values('duration_cap_h')
                 style = method_styles[method]
                 ax.plot(
-                    line_data['Y轴上限(h)'],
-                    line_data['肘点能量渗透率(%)'],
+                    line_data['duration_cap_h'],
+                    line_data['turning_point_penetration_%'],
                     color=COLOR_MAP[int(target)],
                     linestyle=style['linestyle'],
                     marker=style['marker'],
@@ -560,9 +560,9 @@ def run_all_caps():
             # OneDrive may briefly lock an empty directory after child runs.
             pass
 
-    print(f'\n已保存: {summary_output}')
-    print(f'已保存: {detailed_output}')
-    print(f'已保存: {summary_table_output}')
+    print(f'\nSaved: {summary_output}')
+    print(f'Saved: {detailed_output}')
+    print(f'Saved: {summary_table_output}')
     deviation_script = os.path.join(
         SCRIPT_DIR, 'knee_cap_deviation_plot.py')
     subprocess.run(
@@ -570,9 +570,9 @@ def run_all_caps():
         cwd=SCRIPT_DIR,
         check=True,
     )
-    print('\n全部点位漂移（按最大漂移降序）:')
+    print('\nAll turning-point shifts (largest shift first):')
     print(point_pivot.sort_values(
-        '最大漂移(百分点)', ascending=False).to_string(
+        'max_shift_pp', ascending=False).to_string(
         index=False, float_format=lambda value: f'{value:.3f}'))
 
 
@@ -587,12 +587,12 @@ knee_long_rows = []
 knee_wide_rows = []
 
 for scenario, cfg in SCENARIOS:
-    print(f'\n处理: {scenario}')
+    print(f'\nProcessing: {scenario}')
     divisor = cfg['divisor']
     x_cap   = cfg.get('x_cap')
 
     if not os.path.isfile(cfg['path']):
-        print(f'  ⚠ 文件缺失，跳过: {cfg["path"]}')
+        print(f'  ⚠ Input file missing; skipped: {cfg["path"]}')
         continue
     df = pd.read_excel(cfg['path'], sheet_name=0)
     df.columns = df.columns.astype(str).str.strip()
@@ -606,8 +606,8 @@ for scenario, cfg in SCENARIOS:
             price_factor, REFERENCE_BAT_PRICE_FACTOR, rtol=0.0, atol=1e-9)
         if not baseline_mask.any():
             print(
-                f'  ⚠ 缺少 bat_price_factor={REFERENCE_BAT_PRICE_FACTOR:g} '
-                '基准数据，跳过')
+                f'  ⚠ No bat_price_factor={REFERENCE_BAT_PRICE_FACTOR:g} '
+                'baseline data; skipped')
             continue
         df = df.loc[baseline_mask].copy()
 
@@ -617,14 +617,11 @@ for scenario, cfg in SCENARIOS:
     if 'storage_duration_h' in df.columns:
         duration_source = 'storage_duration_h'
         duration_divisor = 1.0
-    elif '小时数' in df.columns:
-        duration_source = '小时数'
-        duration_divisor = 1.0
     elif 'total_batt_MWh' in df.columns:
         duration_source = 'total_batt_MWh'
         duration_divisor = divisor
     else:
-        print(f'  ⚠ 缺少储能时长/容量字段，跳过: {cfg["path"]}')
+        print(f'  ⚠ Storage-duration/capacity field missing; skipped: {cfg["path"]}')
         continue
 
     df = df[['cons_target_%', 'energy_pen_%', duration_source]].copy()
@@ -653,7 +650,7 @@ for scenario, cfg in SCENARIOS:
         t_int = int(round(target))
         color = COLOR_MAP.get(t_int, '#767676')
 
-        if scenario == '海岛' and t_int == 60:
+        if scenario == 'Island' and t_int == 60:
             x_for_curve, y_for_curve = insert_y_cap_endpoint(
                 x_raw, y_raw, Y_CAP)
             xs, ys = get_smooth_xy(x_for_curve, y_for_curve)
@@ -667,7 +664,7 @@ for scenario, cfg in SCENARIOS:
 
         growth_start_x = find_growth_start(x_line, y_line)
         if growth_start_x is None:
-            print(f'  ⚠ {t_int}% 曲线没有达到 {MIN_STORAGE_DURATION_H:g} h，跳过')
+            print(f'  ⚠ {t_int}% curve does not reach {MIN_STORAGE_DURATION_H:g} h; skipped')
             continue
         curve_data[t_int] = [x_line, y_line]
         raw_data[t_int]   = (x_raw, y_raw, color)
@@ -689,33 +686,33 @@ for scenario, cfg in SCENARIOS:
             x_line, y_line, growth_start_x)
         knees = {
             'kneedle': find_kneedle(x_line, y_line, growth_start_x),
-            '曲率最大': find_max_curvature(x_line, y_line, growth_start_x),
+            'maximum_curvature': find_max_curvature(x_line, y_line, growth_start_x),
             'L_method': find_l_method(x_line, y_line, growth_start_x),
         }
         method_knee_data[t_int] = knees
 
         wide_row = {
-            'Y轴上限(h)': Y_CAP,
-            '场景': scenario,
-            '消纳率目标(%)': t_int,
-            '增长起点能量渗透率(%)': growth_start_x,
-            '曲率独立搜索下限(%)': curvature_bounds[0],
-            '曲率独立搜索上限(%)': curvature_bounds[1],
+            'duration_cap_h': Y_CAP,
+            'scenario': scenario,
+            'consumption_target_%': t_int,
+            'growth_start_penetration_%': growth_start_x,
+            'curvature_search_lower_bound_%': curvature_bounds[0],
+            'curvature_search_upper_bound_%': curvature_bounds[1],
         }
         for method in KNEE_METHODS:
             method_x, method_y = knees[method]
             knee_long_rows.append({
-                '场景': scenario,
-                '消纳率目标(%)': t_int,
-                '增长起点能量渗透率(%)': growth_start_x,
-                '曲率独立搜索下限(%)': curvature_bounds[0],
-                '曲率独立搜索上限(%)': curvature_bounds[1],
-                '方法': method,
-                '肘点能量渗透率(%)': method_x,
-                '肘点储能时长(h)': method_y,
+                'scenario': scenario,
+                'consumption_target_%': t_int,
+                'growth_start_penetration_%': growth_start_x,
+                'curvature_search_lower_bound_%': curvature_bounds[0],
+                'curvature_search_upper_bound_%': curvature_bounds[1],
+                'method': method,
+                'turning_point_penetration_%': method_x,
+                'turning_point_duration_h': method_y,
             })
-            wide_row[f'{method}_能量渗透率(%)'] = method_x
-            wide_row[f'{method}_储能时长(h)'] = method_y
+            wide_row[f'{method}_penetration_%'] = method_x
+            wide_row[f'{method}_duration_h'] = method_y
         knee_wide_rows.append(wide_row)
 
     all_panel_data.append({
@@ -739,12 +736,12 @@ if not knee_results_long.empty:
         encoding='utf-8-sig',
         float_format='%.4f',
     )
-    print('\n三种方法肘点统计（临时传递给汇总进程）:')
+    print('\nThree-method turning-point results (temporary aggregation input):')
     print(knee_results_wide.to_string(
         index=False, float_format=lambda value: f'{value:.3f}'))
 
 if ARGS.data_only:
-    print('\n数据子任务完成')
+    print('\nNumeric export completed')
     sys.exit(0)
 
 
@@ -915,7 +912,7 @@ main_output = os.path.join(
         RESULT_DIR, f'cap_sensitivity_{Y_CAP}h_three_methods.svg')
 fig_labeled.savefig(main_output, bbox_inches='tight')
 plt.close(fig_labeled)
-print(f'\n已保存: {main_output}')
+print(f'\nSaved: {main_output}')
 
 clean_dir = os.path.join(CLEAN_ROOT, f'{Y_CAP}h_three_methods')
 os.makedirs(clean_dir, exist_ok=True)
@@ -925,6 +922,6 @@ for panel in all_panel_data:
         clean_dir, f"{SCENARIO_SLUGS[panel['scenario']]}.svg")
     fig_clean.savefig(panel_output, bbox_inches='tight')
     plt.close(fig_clean)
-    print(f'已保存: {panel_output}')
+    print(f'Saved: {panel_output}')
 
-print('\n全部完成')
+print('\nCompleted')

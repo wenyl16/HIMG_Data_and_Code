@@ -461,7 +461,7 @@ L 240.147094 156.332391
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_9">
-    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: middle" x="137.619094" y="13.595" transform="rotate(-0 137.619094 13.595)">乡村</text>
+    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: middle" x="137.619094" y="13.595" transform="rotate(-0 137.619094 13.595)">Rural</text>
    </g>
   </g>
   <g id="axes_2">
@@ -744,7 +744,7 @@ L 496.467094 156.332391
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_17">
-    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: middle" x="393.939094" y="13.595" transform="rotate(-0 393.939094 13.595)">商业</text>
+    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: middle" x="393.939094" y="13.595" transform="rotate(-0 393.939094 13.595)">Commercial</text>
    </g>
   </g>
   <g id="axes_3">
@@ -1042,7 +1042,7 @@ L 240.147094 334.091
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_30">
-    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: middle" x="137.619094" y="191.353609" transform="rotate(-0 137.619094 191.353609)">工业</text>
+    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: middle" x="137.619094" y="191.353609" transform="rotate(-0 137.619094 191.353609)">Industrial</text>
    </g>
   </g>
   <g id="axes_4">
@@ -1337,7 +1337,7 @@ L 496.467094 334.091
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_42">
-    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: middle" x="393.939094" y="191.353609" transform="rotate(-0 393.939094 191.353609)">海岛</text>
+    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: middle" x="393.939094" y="191.353609" transform="rotate(-0 393.939094 191.353609)">Island</text>
    </g>
   </g>
   <g id="legend_1">
@@ -1411,7 +1411,7 @@ z
     </g>
    </g>
    <g id="text_48">
-    <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start" x="194.241187" y="389.655125" transform="rotate(-0 194.241187 389.655125)">曲率最大</text>
+    <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start" x="194.241187" y="389.655125" transform="rotate(-0 194.241187 389.655125)">Maximum curvature</text>
    </g>
    <g id="line2d_107">
     <path d="M 226.641188 387.555125 

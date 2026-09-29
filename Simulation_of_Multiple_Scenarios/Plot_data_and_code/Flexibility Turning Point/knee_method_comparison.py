@@ -24,31 +24,31 @@ OUTPUT_SVG = RESULT_DIR / "knee_method_deviations.svg"
 CLEAN_SVG = CLEAN_DIR / "knee_method_deviations.svg"
 OUTPUT_CSV = RESULT_DIR / "knee_method_deviations_plot_data.csv"
 
-SCENARIOS = ["乡村", "商业", "工业", "海岛"]
+SCENARIOS = ["Rural", "Commercial", "Industrial", "Island"]
 SCENARIO_LABELS = {
-    "乡村": "Rural",
-    "商业": "Commercial",
-    "工业": "Industrial",
-    "海岛": "Island",
+    "Rural": "Rural",
+    "Commercial": "Commercial",
+    "Industrial": "Industrial",
+    "Island": "Island",
 }
 TARGETS = [60, 70, 80, 90, 100]
-METHODS = ["曲率最大", "kneedle", "L_method"]
+METHODS = ["maximum_curvature", "kneedle", "L_method"]
 # Draw L_method before Kneedle so coincident triangles remain on top of squares.
-DRAW_METHODS = ["曲率最大", "L_method", "kneedle"]
+DRAW_METHODS = ["maximum_curvature", "L_method", "kneedle"]
 METHOD_LABELS = {
-    "曲率最大": "Maximum curvature",
+    "maximum_curvature": "Maximum curvature",
     "kneedle": "Kneedle",
     "L_method": "L_method",
 }
 METHOD_STYLES = {
-    "曲率最大": {"marker": "o", "color": "#D9822B", "offset": 0.00, "size": 24},
+    "maximum_curvature": {"marker": "o", "color": "#D9822B", "offset": 0.00, "size": 24},
     "kneedle": {"marker": "^", "color": "#377EB8", "offset": 0.00, "size": 34},
     "L_method": {"marker": "s", "color": "#6B7280", "offset": 0.00, "size": 20},
 }
 METHOD_COLUMNS = {
-    method: f"{method}_能量渗透率(%)" for method in METHODS
+    method: f"{method}_penetration_%" for method in METHODS
 }
-SPAN_COLUMN = "三种方法最大跨度(百分点)"
+SPAN_COLUMN = "three_method_max_span_pp"
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -70,32 +70,32 @@ plt.rcParams.update({
 def load_data():
     df = pd.read_csv(INPUT_CSV, encoding="utf-8-sig")
     required = {
-        "场景", "消纳率目标(%)", SPAN_COLUMN, *METHOD_COLUMNS.values(),
+        "scenario", "consumption_target_%", SPAN_COLUMN, *METHOD_COLUMNS.values(),
     }
     missing = required.difference(df.columns)
     if missing:
         raise ValueError(f"Missing required columns: {sorted(missing)}")
-    df = df[df["场景"].isin(SCENARIOS)].copy()
-    df["场景"] = pd.Categorical(df["场景"], SCENARIOS, ordered=True)
-    df = df.sort_values(["场景", "消纳率目标(%)"]).reset_index(drop=True)
+    df = df[df["scenario"].isin(SCENARIOS)].copy()
+    df["scenario"] = pd.Categorical(df["scenario"], SCENARIOS, ordered=True)
+    df = df.sort_values(["scenario", "consumption_target_%"]).reset_index(drop=True)
     if len(df) != len(SCENARIOS) * len(TARGETS):
         raise ValueError(f"Expected 20 rows, found {len(df)}")
     value_columns = [METHOD_COLUMNS[method] for method in METHODS]
-    df["三方法均值_能量渗透率(%)"] = df[value_columns].mean(axis=1)
+    df["three_method_mean_penetration_%"] = df[value_columns].mean(axis=1)
     deviation_columns = []
     for method in METHODS:
-        column = f"{method}_相对三方法均值偏差(百分点)"
-        df[column] = df[METHOD_COLUMNS[method]] - df["三方法均值_能量渗透率(%)"]
+        column = f"{method}_deviation_from_three_method_mean_pp"
+        df[column] = df[METHOD_COLUMNS[method]] - df["three_method_mean_penetration_%"]
         deviation_columns.append(column)
 
     ordered = [
-        "场景", "消纳率目标(%)",
+        "scenario", "consumption_target_%",
         *[METHOD_COLUMNS[method] for method in METHODS],
-        "三方法均值_能量渗透率(%)",
+        "three_method_mean_penetration_%",
         *deviation_columns,
-        "曲率最大与kneedle_绝对差(百分点)",
-        "曲率最大与L_method_绝对差(百分点)",
-        "kneedle与L_method_绝对差(百分点)",
+        "maximum_curvature_vs_kneedle_abs_pp",
+        "maximum_curvature_vs_L_method_abs_pp",
+        "kneedle_vs_L_method_abs_pp",
         SPAN_COLUMN,
     ]
     return df[ordered]
@@ -111,17 +111,17 @@ def draw_figure(df, labeled=True):
 
     for group_index, scenario in enumerate(SCENARIOS):
         sub = (
-            df[df["场景"] == scenario]
-            .sort_values("消纳率目标(%)")
+            df[df["scenario"] == scenario]
+            .sort_values("consumption_target_%")
             .reset_index(drop=True)
         )
         start = group_index * (group_size + group_gap)
         y_base = start + np.arange(len(sub), dtype=float)
         all_y.extend(y_base)
-        all_target_labels.extend([f"{target}%" for target in sub["消纳率目标(%)"]])
+        all_target_labels.extend([f"{target}%" for target in sub["consumption_target_%"]])
 
         deviation_columns = [
-            f"{method}_相对三方法均值偏差(百分点)" for method in METHODS
+            f"{method}_deviation_from_three_method_mean_pp" for method in METHODS
         ]
         values = sub[deviation_columns].to_numpy(float)
         xmin = np.nanmin(values, axis=1)
@@ -141,7 +141,7 @@ def draw_figure(df, labeled=True):
         for method in DRAW_METHODS:
             style = METHOD_STYLES[method]
             ax.scatter(
-                sub[f"{method}_相对三方法均值偏差(百分点)"],
+                sub[f"{method}_deviation_from_three_method_mean_pp"],
                 y_base + style["offset"],
                 s=style["size"],
                 marker=style["marker"],

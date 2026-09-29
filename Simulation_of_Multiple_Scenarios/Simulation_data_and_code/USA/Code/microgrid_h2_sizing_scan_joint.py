@@ -1,15 +1,15 @@
 """
-USA (Mesa Del Sol) 光储+氢储微电网 PV容量扫描 + 氢储能容量优化 —— 储能成本整体同步打折灵敏度(joint 版)
+USA (Mesa Del Sol) PV-battery-H2 microgrid: PV capacity scan and hydrogen sizing with joint storage cost sensitivity
 ==============================================================================================
-复制自 工业 microgrid_h2_sizing_scan_joint.py, 适配 USA 数据/参数。
-与 microgrid_h2_sizing_scan.py 的区别:
-  - 原版: 电池成本固定, 氢设备(Elec/H2/FC)逐一独立价格灵敏度
-  - joint版: 电池(BAT_CAPEX) + 整个氢系统(ELEC/H2/FC CAPEX) 四类同步乘同一倍数 storage_factor
-扫描: PV容量 × 消纳率目标(60%~100%) × storage_factor[1.0/0.9/0.7/0.5]
-数据: Annual_8760_clean.xlsx (sheet pv_kw / load_kw, 各 2 列 datetime+kW, 有表头, 8760h)
-电价: 无电价列 -> PNM 商业电价 0.12 USD/kWh (flat)
-固定电池 120kW/240kWh (与 bat 版 BASE_BESS 对齐); 电池成本随 storage_factor 打折, PV/电网成本不打折。
-MILP 模型/约束与模板完全一致, 仅 cost 段不同。求解器 Gurobi。
+Adapted from Industry microgrid_h2_sizing_scan_joint.py for USA data and parameters.
+Differences from microgrid_h2_sizing_scan.py:
+  - Original: fixed battery cost; independent price sensitivities for Elec/H2/FC equipment.
+  - Joint version: apply the same storage_factor to battery BAT_CAPEX and all hydrogen CAPEX (ELEC/H2/FC).
+Scan PV capacity, utilization targets (60%-100%), and storage_factor [1.0/0.9/0.7/0.5].
+Data: Annual_8760_clean.xlsx; pv_kw and load_kw sheets, each with datetime and kW columns, a header, and 8760 hours.
+Electricity price: no price column; assume a flat PNM commercial tariff of 0.12 USD/kWh.
+Fixed 120 kW/240 kWh battery, matching BASE_BESS in the battery version; scale battery cost by storage_factor while retaining PV/grid costs.
+The MILP model and constraints match the template; only costs differ. Solver: Gurobi.
 """
 
 import os
@@ -23,20 +23,20 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # ============================================================
-# 1. 系统参数(USA)
+# 1. System parameters (USA)
 # ============================================================
 
-PV_RATED_ORIGINAL = 46             # kW (实测峰值基准)
+PV_RATED_ORIGINAL = 46             # kW: measured peak reference.
 PV_CAPEX = 978                     # $/kW
 PV_LIFE = 25
 PV_OM_RATE = 0.015
 
-PV_SCAN_MIN = 2                   # 下调(原 brownfield 50=现有装机): 对齐 USA greenfield BAT 下限(2), 左延 LCOE-渗透率曲线起点; <现有装机50 属反事实扫描
+PV_SCAN_MIN = 2                   # Lowered from the existing 50 kW to the USA greenfield BAT minimum of 2, extending the LCOE curve to lower penetration; below 50 kW is a counterfactual scan.
 PV_SCAN_MAX = 400
 PV_SCAN_STEP = 5
 
-P_BAT_MAX = 120                    # 原有电池功率 120kW (与离网 calc BASE_BESS 对齐)
-E_BAT_MAX = 240                     # 原有电池 240kWh(对齐中国h2 方法论: 优化时建模固定电池)
+P_BAT_MAX = 120                    # Existing battery power: 120 kW, matching off-grid BASE_BESS.
+E_BAT_MAX = 240                     # Existing battery energy: 240 kWh; model a fixed battery as in the Chinese H2 scenarios.
 ETA_CHARGE = 0.95
 ETA_DISCHARGE = 0.95
 SOC_BAT_MIN = 0.1
@@ -63,22 +63,22 @@ FC_CAPEX = 1700                    # $/kW
 FC_LIFE = 10
 FC_OM_RATE = 0.01
 
-# --- 储能成本整体同步打折(电池+整个氢系统 四类 CAPEX 同倍数) ---
+# Apply one common cost factor to battery and all three hydrogen CAPEX categories.
 STORAGE_PRICE_FACTORS = [1.0]
 
-# --- 备用电源(电网)成本: PNM 商业电价, flat USD/kWh ---
+# Backup grid supply cost: flat PNM commercial tariff, USD/kWh.
 GRID_PRICE_USD = 0.12
 
 DISCOUNT_RATE = 0.05
 
 CONSUMPTION_TARGETS = [0.6, 0.7, 0.8, 0.9, 1.0]
-CONSUMPTION_TOL = 0.0005       # 0.05%  (所有消纳率目标统一)
+CONSUMPTION_TOL = 0.0005       # 0.05% tolerance for all utilization targets
 
 T = 8760
 
 
 # ============================================================
-# 2. 工具函数
+# 2. Helper functions
 # ============================================================
 
 def crf(rate, years):
@@ -88,7 +88,7 @@ def crf(rate, years):
 
 
 def load_raw_data(filepath=None):
-    """读 Annual_8760_clean.xlsx: sheet pv_kw / load_kw (各 col[1], 有表头跳首行). 返回(pv, load)。"""
+    """Read the second column of pv_kw/load_kw in Annual_8760_clean.xlsx, skipping headers; return (pv, load)."""
     if filepath is None:
         filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Annual_8760_clean.xlsx")
     wb = openpyxl.load_workbook(filepath, read_only=True)
@@ -96,7 +96,7 @@ def load_raw_data(filepath=None):
     load_rows = list(wb["load_kw"].iter_rows(values_only=True))
     wb.close()
 
-    # 有表头 -> [1:] 跳首行; col[0]=datetime, col[1]=功率kW
+    # Skip headers with [1:]; col[0]=datetime, col[1]=power in kW.
     pv_raw = [max(0.0, float(r[1])) for r in pv_rows[1:] if r[1] is not None]
     load = [float(r[1]) for r in load_rows[1:] if r[1] is not None]
 
@@ -104,15 +104,15 @@ def load_raw_data(filepath=None):
     pv_raw = pv_raw[:n]
     load = load[:n]
 
-    print(f"  PV: 峰值={max(pv_raw):.1f}kW, 年发电={sum(pv_raw):.0f}kWh (基准 {PV_RATED_ORIGINAL}kW)")
-    print(f"  Load: 峰值={max(load):.1f}kW, 年耗电={sum(load):.0f}kWh")
+    print(f"  PV: peak={max(pv_raw):.1f}kW, annual generation={sum(pv_raw):.0f}kWh (reference {PV_RATED_ORIGINAL}kW)")
+    print(f"  Load: peak={max(load):.1f}kW, annual consumption={sum(load):.0f}kWh")
     print(f"  Grid price: {GRID_PRICE_USD} USD/kWh (flat)")
-    print(f"  数据长度: {n}h")
+    print(f"  Data length: {n}h")
     return pv_raw, load
 
 
 def build_prices():
-    """USA flat 商业电价 USD/kWh。"""
+    """Return the flat USA commercial tariff in USD/kWh."""
     return [GRID_PRICE_USD] * T
 
 
@@ -122,13 +122,13 @@ def scale_pv(pv_raw, pv_rated):
 
 
 # ============================================================
-# 3. 单场景 MILP 求解(模型与模板一致, 仅 cost 段用 storage_factor)
+# 3. Solve one MILP using the template model, with storage_factor applied to costs.
 # ============================================================
 
 def solve_scenario(pv, load, prices, pv_rated, consumption_target, storage_factor=1.0):
     """
-    storage_factor: 电池+整个氢系统(BAT/ELEC/H2/FC CAPEX)同步打折倍数(默认1.0=原价)。
-    E_BAT_MAX=0 时无固定电池, 仅 H2 储能。
+    storage_factor scales BAT/ELEC/H2/FC CAPEX together; 1.0 retains baseline costs.
+    E_BAT_MAX=0 removes the fixed battery, leaving hydrogen storage only.
     """
     has_battery = E_BAT_MAX > 0
     total_pv = sum(pv)
@@ -151,7 +151,7 @@ def solve_scenario(pv, load, prices, pv_rated, consumption_target, storage_facto
     model.setParam("TimeLimit", 600)
     mipgap = 0.005 if consumption_target < 1.0 else 0.02
     model.setParam("MIPGap", mipgap)
-    model.setParam("Threads", 1)   # 单线程确定性求解, 与并行版对齐, 保证串行==并行可复现
+    model.setParam("Threads", 1)   # Use one solver thread, matching the parallel version for consistent serial/parallel runs.
 
     idx = range(T)
 
@@ -188,7 +188,7 @@ def solve_scenario(pv, load, prices, pv_rated, consumption_target, storage_facto
     crf_h2 = crf(DISCOUNT_RATE, H2_LIFE)
     crf_fc = crf(DISCOUNT_RATE, FC_LIFE)
 
-    # cost 段: 储能四类 CAPEX 同步乘 storage_factor; PV/电网不变 (E_BAT_MAX=0 时 cost_bat=0)
+    # Scale all four storage CAPEX categories by storage_factor; retain PV/grid costs. If E_BAT_MAX=0, cost_bat=0.
     cost_pv = (crf_pv + PV_OM_RATE) * PV_CAPEX * pv_rated
     cost_bat = (crf_bat + BAT_OM_RATE) * (BAT_CAPEX * storage_factor) * E_BAT_MAX
     cost_elec = (crf_elec + ELEC_OM_RATE) * (ELEC_CAPEX * storage_factor) * P_ELEC_CAP
@@ -230,7 +230,7 @@ def solve_scenario(pv, load, prices, pv_rated, consumption_target, storage_facto
     model.addConstr(m_h2[T - 1] == SOC_H2_INIT * H2_TANK, name="h2_final")
 
     curtail_sum = gp.quicksum(P_PV_curt[t] for t in idx)
-    cons_tol = CONSUMPTION_TOL   # 所有消纳目标统一用 0.05%
+    cons_tol = CONSUMPTION_TOL   # Use a 0.05% tolerance for every utilization target.
     max_curtail = (1 - consumption_target + cons_tol) * total_pv
     min_curtail = max(0, (1 - consumption_target - cons_tol) * total_pv)
     model.addConstr(curtail_sum <= max_curtail, name="curt_hi")
@@ -259,7 +259,7 @@ def solve_scenario(pv, load, prices, pv_rated, consumption_target, storage_facto
     actual_cons = (total_pv - total_curtail) / total_pv * 100
     lcoe = model.ObjVal / total_load
 
-    # 年化投资明细(打折后口径, 与目标函数一致)
+    # Annualized investment breakdown after cost scaling, consistent with the objective.
     ann_pv = (crf_pv + PV_OM_RATE) * PV_CAPEX * pv_rated
     ann_bat = (crf_bat + BAT_OM_RATE) * (BAT_CAPEX * storage_factor) * E_BAT_MAX
     ann_elec = (crf_elec + ELEC_OM_RATE) * (ELEC_CAPEX * storage_factor) * elec_cap
@@ -289,7 +289,7 @@ def solve_scenario(pv, load, prices, pv_rated, consumption_target, storage_facto
 
 
 # ============================================================
-# 4. 结果保存
+# 4. Save results.
 # ============================================================
 
 def save_to_excel(results, filename=None):
@@ -311,12 +311,12 @@ def save_to_excel(results, filename=None):
     ]
     ws.append(headers)
 
-    cap_field = "PV_MW"  # 容量扫描轴(同 plot_results fig1/fig2)
-    # 1) 丢 h2_on=0(三设备同步=0)
+    cap_field = "PV_MW"  # Capacity scan axis, matching plot_results figures 1 and 2.
+    # 1. Drop h2_on=0 configurations with all three hydrogen capacities equal to zero.
     rows = [r for r in results
             if not (r["elec_cap_kW"] == 0 and r["fc_cap_kW"] == 0 and r["h2_tank_kg"] == 0)]
-    # 2) 按 (cons_target_pct, storage_factor) 分组, 丢 pen 回退点 —— 与 fig1/fig2 的
-    #    _mono_pen_by_cap 同语义(1e-9 阈值) -> xlsx 与图逐点 1:1; sf 多值时仅各组内过滤, 不误伤其它 sf
+    # 2. Group by (cons_target_pct, storage_factor) and drop penetration reversals, matching
+    #    _mono_pen_by_cap in figures 1/2 (1e-9 tolerance). Filter within each factor group so Excel and plots agree point for point.
     keep = set()
     groups = {}
     for r in rows:
@@ -343,18 +343,18 @@ def save_to_excel(results, filename=None):
         ws.column_dimensions[col[0].column_letter].width = max_len + 2
 
     wb.save(filename)
-    print(f"结果已保存到 {filename}")
+    print(f"Results saved to {filename}")
 
 
 # ============================================================
-# 5. 可视化(参考 bat 版风格, 按 storage_factor)
+# 5. Visualization by storage_factor, following the battery version's style.
 # ============================================================
 
 
 def _mono_pen_by_cap(points):
-    """按 cap(=扫描序, 天然单调)排序后, 丢弃使 energy_pen 回退的点。
-    消除 H2-onset 处 0.5% MIPGap 边界次优解导致的 pen 非单调 zigzag。
-    points: list of (cap, pen, lcoe) -> 返回过滤后的同结构列表(按 cap 升序)。"""
+    """Sort by cap (the monotonic scan order), then drop points where energy_pen decreases.
+    Remove penetration zigzags near H2 adoption caused by suboptimal solutions within the 0.5% MIPGap.
+    points: list of (cap, pen, lcoe); return a filtered list of the same structure, sorted by cap."""
     pts = sorted(points, key=lambda p: p[0])
     out = []
     max_pen = -1e18
@@ -366,9 +366,9 @@ def _mono_pen_by_cap(points):
 
 
 def _drop_pen_regressions(rows, cap_key, pen_key="energy_pen_pct"):
-    """与 _mono_pen_by_cap 同语义的行级版本: 按 cap 升序, 丢弃使 pen 回退的整行。
-    供 save_to_excel / retrim 使用, 让 xlsx 与 fig1/fig2 逐点 1:1。
-    pen_key 默认 result-dict 的 "energy_pen_pct"; retrim 读 xlsx 时传 "energy_pen_%"。"""
+    """Row-level equivalent of _mono_pen_by_cap: sort by cap and drop rows where penetration decreases.
+    Used by save_to_excel and retrim to keep Excel and figures 1/2 identical point for point.
+    pen_key defaults to result-dict key "energy_pen_pct"; use "energy_pen_%" when retrimming Excel data."""
     by_cap = sorted(rows, key=lambda r: r[cap_key])
     out = []
     max_pen = -1e18
@@ -387,12 +387,12 @@ def plot_results(results):
     base = [r for r in results if r["storage_factor"] == 1.0
             and not (r["elec_cap_kW"] == 0 and r["fc_cap_kW"] == 0 and r["h2_tank_kg"] == 0)]
 
-    # 图1: LCOE vs 渗透率 (baseline storage=1.0)
+    # Figure 1: LCOE vs penetration, with baseline storage_factor=1.0.
     fig1, ax1 = plt.subplots(figsize=(11, 7))
     for i, ct in enumerate(CONSUMPTION_TARGETS):
         ct_pct = ct * 100
         raw = [(r["PV_MW"], r["energy_pen_pct"], r["LCOE"]) for r in base if r["cons_target_pct"] == ct_pct]
-        pts = sorted(_mono_pen_by_cap(raw), key=lambda p: p[1])  # x = 渗透率
+        pts = sorted(_mono_pen_by_cap(raw), key=lambda p: p[1])  # x = penetration
         if pts:
             xs = [p[1] for p in pts]; ys = [p[2] for p in pts]
             ax1.plot(xs, ys, linewidth=1.5, color=colors[i], marker="o", markersize=2, label=f"{ct_pct:.0f}%")
@@ -405,12 +405,12 @@ def plot_results(results):
     fig1.savefig(os.path.join(out_dir, "plot_joint_lcoe_vs_penetration.png"), dpi=150)
     plt.close(fig1)
 
-    # 图2: LCOE vs PV (baseline)
+    # Figure 2: LCOE vs PV (baseline)
     fig2, ax2 = plt.subplots(figsize=(11, 7))
     for i, ct in enumerate(CONSUMPTION_TARGETS):
         ct_pct = ct * 100
         raw = [(r["PV_MW"], r["energy_pen_pct"], r["LCOE"]) for r in base if r["cons_target_pct"] == ct_pct]
-        pts = sorted(_mono_pen_by_cap(raw), key=lambda p: p[0])  # x = PV 容量
+        pts = sorted(_mono_pen_by_cap(raw), key=lambda p: p[0])  # x = PV capacity
         if pts:
             xs = [p[0] for p in pts]; ys = [p[2] for p in pts]
             ax2.plot(xs, ys, linewidth=1.5, color=colors[i], label=f"{ct_pct:.0f}%")
@@ -423,7 +423,7 @@ def plot_results(results):
     fig2.savefig(os.path.join(out_dir, "plot_joint_lcoe_vs_pv.png"), dpi=150)
     plt.close(fig2)
 
-    # 图3: 各H2设备容量 vs PV, 按 storage_factor 分线(每个 ct 一个子图)
+    # Figure 3: H2 equipment capacity vs PV, with separate storage_factor curves and one panel per ct.
     for cap_name, cap_key, ylab in [("Electrolyzer", "elec_cap_kW", "kW"),
                                     ("H2 Tank", "h2_tank_kg", "kg"),
                                     ("Fuel Cell", "fc_cap_kW", "kW")]:
@@ -449,7 +449,7 @@ def plot_results(results):
         fig.savefig(os.path.join(out_dir, f"plot_joint_{cap_key.replace('_kW','').replace('_kg','')}_sensitivity.png"), dpi=150)
         plt.close(fig)
 
-    # 图4: LCOE vs storage_factor (均值 + min/max 范围)
+    # Figure 4: LCOE vs storage_factor, showing the mean and minimum/maximum range.
     fig_lcoe, ax_l = plt.subplots(figsize=(10, 6))
     factors_sorted = sorted(STORAGE_PRICE_FACTORS)
     means, lo, hi = [], [], []
@@ -470,17 +470,17 @@ def plot_results(results):
     fig_lcoe.savefig(os.path.join(out_dir, "plot_joint_lcoe_sensitivity.png"), dpi=150)
     plt.close(fig_lcoe)
 
-    print("图表已保存: plot_joint_lcoe_vs_penetration.png, plot_joint_lcoe_vs_pv.png, "
+    print("Figures saved: plot_joint_lcoe_vs_penetration.png, plot_joint_lcoe_vs_pv.png, "
           "plot_joint_elec_cap_sensitivity.png, plot_joint_h2_tank_sensitivity.png, "
           "plot_joint_fc_cap_sensitivity.png, plot_joint_lcoe_sensitivity.png")
 
 
 # ============================================================
-# 6. 主程序
+# 6. Main program
 # ============================================================
 
 if __name__ == "__main__":
-    print("正在读取 USA (清洗后) 数据...")
+    print("Reading cleaned USA data...")
     pv_raw, load_data = load_raw_data()
     prices = build_prices()
 
@@ -495,11 +495,11 @@ if __name__ == "__main__":
     n_ok = 0
     t_start = time.time()
 
-    print(f"扫描(joint 储能同步打折): {n_pv} PV × {n_ct} 消纳率 × {n_sf} storage_factor = {n_total} 场景")
-    print(f"PV范围: {PV_SCAN_MIN}~{PV_SCAN_MAX} kW, 步长 {PV_SCAN_STEP} kW")
-    print(f"storage_factor(电池+整个氢系统 同步): {STORAGE_PRICE_FACTORS}")
+    print(f"Scan (joint storage cost scaling): {n_pv} PV × {n_ct} utilization targets x {n_sf} storage_factor = {n_total} scenarios")
+    print(f"PV range: {PV_SCAN_MIN}~{PV_SCAN_MAX} kW, step {PV_SCAN_STEP} kW")
+    print(f"storage_factor (battery and all hydrogen equipment): {STORAGE_PRICE_FACTORS}")
     if E_BAT_MAX == 0:
-        print(f"E_BAT_MAX=0 -> 无固定电池, 仅 H2 储能")
+        print(f"E_BAT_MAX=0 -> no fixed battery; hydrogen storage only")
     print()
 
     for storage_factor in STORAGE_PRICE_FACTORS:
@@ -512,8 +512,8 @@ if __name__ == "__main__":
                     elapsed = time.time() - t_start
                     rate = n_done / elapsed if elapsed > 0 else 0
                     eta = (n_total - n_done) / rate if rate > 0 else 0
-                    print(f"  进度 {n_done}/{n_total} ({n_done/n_total*100:.0f}%)  "
-                          f"可行 {n_ok}  已用 {elapsed:.0f}s  剩余 ~{eta:.0f}s")
+                    print(f"  Progress {n_done}/{n_total} ({n_done/n_total*100:.0f}%)  "
+                          f"feasible {n_ok}  elapsed {elapsed:.0f}s  remaining ~{eta:.0f}s")
 
                 r = solve_scenario(pv, load_data, prices, pv_kw, ct, storage_factor=storage_factor)
                 if r is not None:
@@ -521,10 +521,10 @@ if __name__ == "__main__":
                     n_ok += 1
 
     elapsed = time.time() - t_start
-    print(f"\n扫描完成: {n_ok}/{n_total} 可行, 耗时 {elapsed:.1f}s")
+    print(f"\nScan complete: {n_ok}/{n_total} feasible, elapsed {elapsed:.1f}s")
 
     if all_results:
         save_to_excel(all_results)
         plot_results(all_results)
     else:
-        print("无可行解, 请检查参数设置")
+        print("No feasible solution; check the parameters")

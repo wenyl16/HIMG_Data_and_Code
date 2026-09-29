@@ -1033,7 +1033,7 @@ L 161.950969 215.105551
 " style="fill: none; stroke: #4c78a8; stroke-width: 1.4; stroke-linecap: square"/>
    </g>
    <g id="text_34">
-    <text style="font-size: 5.9px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start" x="166.670969" y="217.170551" transform="rotate(-0 166.670969 217.170551)">乡村</text>
+    <text style="font-size: 5.9px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start" x="166.670969" y="217.170551" transform="rotate(-0 166.670969 217.170551)">Rural</text>
    </g>
    <g id="line2d_86">
     <path d="M 185.255969 215.105551 
@@ -1042,7 +1042,7 @@ L 197.055969 215.105551
 " style="fill: none; stroke: #f28e2b; stroke-width: 1.4; stroke-linecap: square"/>
    </g>
    <g id="text_35">
-    <text style="font-size: 5.9px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start" x="201.775969" y="217.170551" transform="rotate(-0 201.775969 217.170551)">商业</text>
+    <text style="font-size: 5.9px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start" x="201.775969" y="217.170551" transform="rotate(-0 201.775969 217.170551)">Commercial</text>
    </g>
    <g id="line2d_87">
     <path d="M 220.360969 215.105551 
@@ -1051,7 +1051,7 @@ L 232.160969 215.105551
 " style="fill: none; stroke: #59a14f; stroke-width: 1.4; stroke-linecap: square"/>
    </g>
    <g id="text_36">
-    <text style="font-size: 5.9px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start" x="236.880969" y="217.170551" transform="rotate(-0 236.880969 217.170551)">工业</text>
+    <text style="font-size: 5.9px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start" x="236.880969" y="217.170551" transform="rotate(-0 236.880969 217.170551)">Industrial</text>
    </g>
    <g id="line2d_88">
     <path d="M 255.465969 215.105551 
@@ -1060,7 +1060,7 @@ L 267.265969 215.105551
 " style="fill: none; stroke: #b279a2; stroke-width: 1.4; stroke-linecap: square"/>
    </g>
    <g id="text_37">
-    <text style="font-size: 5.9px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start" x="271.985969" y="217.170551" transform="rotate(-0 271.985969 217.170551)">海岛</text>
+    <text style="font-size: 5.9px; font-family: 'Microsoft YaHei', 'SimHei', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start" x="271.985969" y="217.170551" transform="rotate(-0 271.985969 217.170551)">Island</text>
    </g>
    <g id="line2d_89">
     <path d="M 290.570969 215.105551 

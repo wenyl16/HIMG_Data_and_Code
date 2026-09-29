@@ -49,10 +49,10 @@ SENSITIVITY_RESULT_DIR.mkdir(parents=True, exist_ok=True)
 CLEAN_ROOT.mkdir(parents=True, exist_ok=True)
 
 SCENARIOS = [
-    ("工业", "industrial", "Industrial scenario"),
-    ("海岛", "island", "Island scenario"),
-    ("商业", "commercial", "Commercial scenario"),
-    ("乡村", "rural", "Rural scenario"),
+    ("Industrial", "industrial", "Industrial scenario"),
+    ("Island", "island", "Island scenario"),
+    ("Commercial", "commercial", "Commercial scenario"),
+    ("Rural", "rural", "Rural scenario"),
 ]
 
 BAT_FILE_CANDIDATES = [

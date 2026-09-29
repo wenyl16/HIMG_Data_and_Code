@@ -1,35 +1,35 @@
-﻿灵活性拐点与经济交叉点的先后顺序
+Ordering of flexibility knees and economic crossover points
 
-经济数据：E:\OneDrive\Working\Research\11电氢微电网宏观研究\画图\Data_and_Code\Simulation_of_Multiple_Scenarios\Plot_data_and_code\Economic Breakeven Point\data\sensitivity
-仅使用 battery.xlsx 的 bat_price_factor=1.0 和 hydrogen.xlsx 的 storage_factor=1.0。
-灵活性数据：E:\OneDrive\Working\Research\11电氢微电网宏观研究\画图\Data_and_Code\Simulation_of_Multiple_Scenarios\Plot_data_and_code\Flexibility Turning Point\results\domestic_flexibility_knee_method_differences.csv
-灵活性拐点沿用已保存的三方法结果，不重新识别；该结果使用 200 h 储能时长上限。
-经济计算沿用原经济绘图算法，渗透率 0--99.9%，离网时长上限 500 h。
-两处时长上限属于各自原有阈值定义，不在本次比较中改动。
+Economic data: Economic Breakeven Point/data/sensitivity
+Only battery.xlsx rows with bat_price_factor=1.0 and hydrogen.xlsx rows with storage_factor=1.0 are used.
+Flexibility data: Flexibility Turning Point/results/domestic_flexibility_knee_method_differences.csv
+The saved results of the three knee methods are used without redetection; their storage-duration analysis cap is 200 h.
+Economic crossover points follow the economic plotting algorithm, with penetration from 0--99.9% and an off-grid duration cap of 500 h.
+The two duration caps belong to the respective threshold definitions and are retained in this comparison.
 
-比较轴为能源渗透率，不是时间或离网时长。
-Delta p = 经济交叉点渗透率 - 灵活性拐点渗透率；重合容差 = 0.0001 个百分点。
-Delta p > 容差：灵活性拐点领先；Delta p < -容差：滞后；绝对值不超过容差：重合。
-无经济交叉点或缺少灵活性拐点单独列出，均不纳入领先/滞后/重合及其占比分母。
-每种方法的分母是有效的场景×目标组合数；跨方法合计是方法判断次数，不是独立场景数。
+The comparison axis is renewable energy penetration, rather than elapsed or off-grid duration.
+Delta p = economic crossover penetration - flexibility knee penetration; coincidence tolerance = 0.0001 percentage points.
+Delta p > tolerance: the flexibility knee is ahead; Delta p < -tolerance: behind; absolute differences within tolerance: coincident.
+Cases with no economic crossover or a missing flexibility knee are reported separately and excluded from the ahead/behind/coincident counts and percentage denominators.
+The denominator for each method is the number of valid scenario-target combinations; a total across methods counts method-specific comparisons, not independent scenarios.
 
-方法	总组合	有效比较	领先	滞后	重合	无经济交叉点	缺少灵活性拐点	领先占比(%)
-最大曲率法	20	19	18	1	0	1	0	94.74
+Method	Total combinations	Valid comparisons	Ahead	Behind	Coincident	No economic crossover	Missing flexibility knee	Ahead share (%)
+Maximum curvature	20	19	18	1	0	1	0	94.74
 Kneedle	20	19	17	2	0	1	0	89.47
 L_method	20	19	17	2	0	1	0	89.47
 
-滞后明细（百分点）：
-工业 / 100% / Kneedle: p_f=53.4326, p_e=52.0841, Delta p=-1.3485
-工业 / 100% / L_method: p_f=53.4326, p_e=52.0841, Delta p=-1.3485
-乡村 / 100% / 最大曲率法: p_f=61.0332, p_e=52.6728, Delta p=-8.3604
-乡村 / 100% / Kneedle: p_f=63.6435, p_e=52.6728, Delta p=-10.9707
-乡村 / 100% / L_method: p_f=64.9487, p_e=52.6728, Delta p=-12.2759
+Cases in which the flexibility knee is behind (percentage points):
+Industrial / 100% / Kneedle: p_f=53.4326, p_e=52.0841, Delta p=-1.3485
+Industrial / 100% / L_method: p_f=53.4326, p_e=52.0841, Delta p=-1.3485
+Rural / 100% / Maximum curvature: p_f=61.0332, p_e=52.6728, Delta p=-8.3604
+Rural / 100% / Kneedle: p_f=63.6435, p_e=52.6728, Delta p=-10.9707
+Rural / 100% / L_method: p_f=64.9487, p_e=52.6728, Delta p=-12.2759
 
-分析域内无经济交叉点的组合：
-海岛 / 60%
+Combinations with no economic crossover in the analysed domain:
+Island / 60%
 
-输出文件：
-comparison_details.csv：逐场景、目标、方法的阈值、差值、先后顺序。
-summary_by_method.csv：各方法的总数、有效数、各类数量及有效比较中的占比。
-summary_by_scenario_method.csv：按场景及方法细分的相同统计。
-summary.txt：本说明与主要结果。
+Output files:
+comparison_details.csv: thresholds, differences and ordering by scenario, target and method.
+summary_by_method.csv: total and valid counts, outcome counts and shares among valid comparisons by method.
+summary_by_scenario_method.csv: the same statistics grouped by scenario and method.
+summary.txt: this explanation and the main results.

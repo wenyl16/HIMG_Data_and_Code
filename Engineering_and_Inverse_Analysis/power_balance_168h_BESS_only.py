@@ -1,17 +1,17 @@
 """
-纯电池储能微电网168小时离网测试数据可视化 (Nature风格)
-两种BESS配置对比：enough_BESS（充足电池）和 original_BESS（原始电池）
+Visualize a 168-hour off-grid test of a battery-only microgrid (Nature style).
+Compare two BESS configurations: enough_BESS (sufficient capacity) and original_BESS (original capacity).
 
-包含2个子图：功率平衡曲线图、电池SOC状态图（无氢储能相关曲线）
+Two panels show power balance and battery SOC, without hydrogen-storage curves.
 
-数据源（与本脚本位于同一目录）：
+Data sources (in the same directory as this script):
   enough_BESS.xlsx
   original_BESS.xlsx
 
-功率曲线（3条）：
-- Renewable Gen = 光伏（正值）
-- Storage Output = 电池放电 - 电池充电（正/负）
-- Load = 负荷（负值）
+Three power curves:
+- Renewable Gen = PV (positive)
+- Storage Output = battery discharge minus battery charge (positive/negative)
+- Load = load (negative)
 """
 
 import numpy as np
@@ -21,7 +21,7 @@ from matplotlib import gridspec
 import os
 from pathlib import Path
 
-# ==================== 配置 ====================
+# ==================== Configuration ====================
 SCRIPT_DIR = Path(__file__).resolve().parent
 OUTPUT_PATH = SCRIPT_DIR / "figures"
 
@@ -43,10 +43,10 @@ LABELS = {
 }
 
 
-# ==================== 绘图函数 ====================
+# ==================== Plotting function ====================
 
 def plot_bess_figure(key):
-    """为单个BESS配置生成图：功率平衡 + 电池SOC"""
+    """Plot power balance and battery SOC for one BESS configuration."""
 
     plt.rcParams.update({
         'font.family': 'Arial',
@@ -74,11 +74,11 @@ def plot_bess_figure(key):
     })
 
     print(f"\n{'='*50}")
-    print(f"读取 {LABELS[key]} 数据...")
+    print(f"Reading {LABELS[key]} data...")
     df = pd.read_excel(FILES[key], sheet_name='SimulationResults', header=0)
     N_DATA = len(df)
 
-    # 不足336点（168h）时，功率补零，SOC延续原始数据的最后一个值
+    # If fewer than 336 points (168 h) are available, pad power with zeros and retain the final SOC.
     N_FULL = 336
     if N_DATA < N_FULL:
         pad_len = N_FULL - N_DATA
@@ -92,28 +92,28 @@ def plot_bess_figure(key):
             'Battery_SOC_pct': np.full(pad_len, last_soc),
         })
         df = pd.concat([df, pad_df], ignore_index=True)
-        print(f"  原始 {N_DATA} 点，补全至 {N_FULL} 点（168h）；"
-              f"功率补零，补全段SOC保持为 {last_soc:.6f}%")
+        print(f"  Original {N_DATA} points; padded to {N_FULL} points (168 h); "
+              f"power padded with zeros and SOC held at {last_soc:.6f}%")
     else:
-        print(f"  共 {N_DATA} 个时间点，完整168小时")
+        print(f"  {N_DATA} time points covering the full 168 hours")
 
     t = df['Time_h'].values
     T_MAX = 168.0
 
-    # ========== 计算3条曲线 ==========
+    # ========== Calculate the three curves ==========
     renewable_gen = df['PV_kW'].values
     storage_output = -df['Battery_kW'].values
     load_total = -df['Load_kW'].values
     battery_soc = df['Battery_SOC_pct'].values
 
-    # ==================== 创建图表 ====================
-    print(f"生成 {LABELS[key]} 图表...")
+    # ==================== Create the figure ====================
+    print(f"Generating the {LABELS[key]} figure...")
 
     fig = plt.figure(figsize=(15.4, 6.5), dpi=300)
     gs = gridspec.GridSpec(2, 1, height_ratios=[1.6, 0.6], hspace=0.28,
                            left=0.09, right=0.72, top=0.94, bottom=0.10)
 
-    # ========== 子图(a): 功率平衡曲线图 ==========
+    # ========== Panel (a): power balance ==========
     ax1 = fig.add_subplot(gs[0])
 
     ax1.plot(t, renewable_gen, color=COLORS['renewable_gen'], linewidth=3.6,
@@ -137,7 +137,7 @@ def plot_bess_figure(key):
     ax1.legend(bbox_to_anchor=(1.10, 0.5), loc='center left', fontsize=7,
                frameon=True, fancybox=False, edgecolor='#CCCCCC', framealpha=0.9)
 
-    # ========== 子图(b): 电池SOC ==========
+    # ========== Panel (b): battery SOC ==========
     ax2 = fig.add_subplot(gs[1])
 
     soc_color = COLORS['soc']
@@ -156,19 +156,19 @@ def plot_bess_figure(key):
     ax2.legend(bbox_to_anchor=(1.10, 0.5), loc='center left', fontsize=7,
                frameon=True, fancybox=False, edgecolor='#CCCCCC', framealpha=0.9)
 
-    # ========== 保存 ==========
+    # ========== Save ==========
     os.makedirs(OUTPUT_PATH, exist_ok=True)
     outname_svg = f"figure_power_balance_{key}_BESS.svg"
     outname_png = f"figure_power_balance_{key}_BESS.png"
     plt.savefig(OUTPUT_PATH / outname_svg, bbox_inches='tight')
     plt.savefig(OUTPUT_PATH / outname_png, dpi=300, bbox_inches='tight')
 
-    print(f"  已保存到 {OUTPUT_PATH}/{outname_svg}")
-    print(f"  已保存到 {OUTPUT_PATH}/{outname_png}")
+    print(f"  Saved to {OUTPUT_PATH}/{outname_svg}")
+    print(f"  Saved to {OUTPUT_PATH}/{outname_png}")
     plt.close()
 
 
 if __name__ == "__main__":
     for key in ['enough', 'original']:
         plot_bess_figure(key)
-    print("\n全部完成!")
+    print("\nAll figures completed!")

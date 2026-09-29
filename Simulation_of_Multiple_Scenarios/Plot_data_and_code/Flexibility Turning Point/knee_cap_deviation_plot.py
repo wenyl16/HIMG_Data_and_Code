@@ -18,11 +18,11 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 RESULT_DIR = SCRIPT_DIR / "results"
 SOURCE_FILE = RESULT_DIR / "cap_sensitivity_all_results.csv"
 
-SCENARIOS = ["乡村", "商业", "工业", "海岛"]
-METHODS = ["曲率最大", "kneedle", "L_method"]
+SCENARIOS = ["Rural", "Commercial", "Industrial", "Island"]
+METHODS = ["maximum_curvature", "kneedle", "L_method"]
 METHOD_LABELS = {
     "kneedle": "Kneedle",
-    "曲率最大": "Maximum curvature",
+    "maximum_curvature": "Maximum curvature",
     "L_method": "L-method",
 }
 TARGETS = [60, 70, 80, 90, 100]
@@ -40,14 +40,14 @@ CAP_STYLES = {
 }
 METHOD_STYLES = {
     "kneedle": {"color": "#377EB8"},
-    "曲率最大": {"color": "#D9822B"},
+    "maximum_curvature": {"color": "#D9822B"},
     "L_method": {"color": "#6A51A3"},
 }
 SCENARIO_STYLES = {
-    "乡村": {"color": "#4C78A8"},
-    "商业": {"color": "#F28E2B"},
-    "工业": {"color": "#59A14F"},
-    "海岛": {"color": "#B279A2"},
+    "Rural": {"color": "#4C78A8"},
+    "Commercial": {"color": "#F28E2B"},
+    "Industrial": {"color": "#59A14F"},
+    "Island": {"color": "#B279A2"},
 }
 VERTICAL_OFFSETS = {150: -0.12, 250: 0.12}
 TOLERANCE_BAND = 1.0
@@ -79,22 +79,22 @@ def load_deviations():
             "Run knee_cap_sensitivity_analysis.py first."
         )
     wide = pd.read_csv(SOURCE_FILE, encoding="utf-8-sig")
-    required = {"Y轴上限(h)", "场景", "消纳率目标(%)"}
+    required = {"duration_cap_h", "scenario", "consumption_target_%"}
     for method in METHODS:
-        required.add(f"{method}_能量渗透率(%)")
+        required.add(f"{method}_penetration_%")
     missing = sorted(required.difference(wide.columns))
     if missing:
         raise ValueError(f"Sensitivity table is missing columns: {missing}")
 
     rows = []
     for method in METHODS:
-        value_col = f"{method}_能量渗透率(%)"
+        value_col = f"{method}_penetration_%"
         method_data = wide[[
-            "Y轴上限(h)", "场景", "消纳率目标(%)", value_col,
+            "duration_cap_h", "scenario", "consumption_target_%", value_col,
         ]].rename(columns={
-            "Y轴上限(h)": "cap",
-            "场景": "scenario",
-            "消纳率目标(%)": "target",
+            "duration_cap_h": "cap",
+            "scenario": "scenario",
+            "consumption_target_%": "target",
             value_col: "value",
         })
         baseline = (

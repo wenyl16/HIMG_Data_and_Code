@@ -1,12 +1,12 @@
 """
-光储+氢储微电网 PV容量扫描 + 氢储能容量优化 —— 储能成本整体同步打折灵敏度(joint 版, 乡村)
+PV capacity scan and hydrogen storage sizing with joint storage cost sensitivity (rural scenario).
 ================================================================================
-与 microgrid_h2_sizing_scan.py 的区别:
-  - 原版: 电池成本固定, 氢设备(Elec/H2/FC)逐一独立价格灵敏度
-  - joint版: 电池(BAT_CAPEX) + 整个氢系统(ELEC/H2/FC CAPEX) 四类同步乘同一倍数 storage_factor
-扫描: PV容量 × 消纳率目标(60%~100%) × storage_factor[1.0/0.9/0.7/0.5]
-电池容量仍固定(2000kWh), 只成本打折; PV/电网成本不参与打折。
-MILP 模型/约束与原版完全一致, 仅 cost 段不同。求解器 Gurobi。
+Differences from microgrid_h2_sizing_scan.py:
+  - Original: fixed battery cost, with independent price sensitivity for each hydrogen component (Elec/H2/FC).
+  - Joint version: multiply all four CAPEX terms (BAT/ELEC/H2/FC) by the same storage_factor.
+Scan: PV capacity x utilization target (60%-100%) x storage_factor [1.0/0.9/0.7/0.5].
+Battery capacity remains fixed at 2000 kWh; only its cost is scaled. PV and grid costs are unchanged.
+The MILP model and constraints match the original; only the cost calculation changes. Solver: Gurobi.
 """
 
 import os
@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # ============================================================
-# 1. 系统参数(与乡村原 h2 一致)
+# 1. System parameters (same as the original rural H2 model)
 # ============================================================
 
 PV_RATED_ORIGINAL = 1000
@@ -60,12 +60,12 @@ FC_CAPEX = 1300
 FC_LIFE = 10
 FC_OM_RATE = 0.01
 
-# --- 储能成本整体同步打折(电池+整个氢系统 四类 CAPEX 同倍数) ---
+# --- Joint storage cost scaling: one multiplier for BAT/ELEC/H2/FC CAPEX ---
 STORAGE_PRICE_FACTORS = [1.0, 0.9, 0.7, 0.5]
 
-# --- 电价 (RMB/kWh, /7 转 USD) --- 两段制, 无季节区分
-PRICE_PEAK = 0.568 / 7    # 峰时段 8:00-22:00
-PRICE_VALLEY = 0.288 / 7  # 谷时段 22:00-次日8:00
+# --- Electricity tariff (RMB/kWh, divided by 7 to convert to USD): two periods, no seasonal variation ---
+PRICE_PEAK = 0.568 / 7    # Peak: 8:00-22:00.
+PRICE_VALLEY = 0.288 / 7  # Off-peak: 22:00-8:00 the next day.
 
 DISCOUNT_RATE = 0.05
 
@@ -76,7 +76,7 @@ T = 8760
 
 
 # ============================================================
-# 2. 工具函数
+# 2. Helper functions
 # ============================================================
 
 def crf(rate, years):
@@ -96,7 +96,7 @@ def load_raw_data(filepath=None):
 
 
 def build_prices():
-    # 两段制: 8-22 峰, 其余谷
+    # Two-period tariff: peak 8-22, off-peak at all other hours.
     prices = []
     for i in range(T):
         h = i % 24
@@ -111,12 +111,12 @@ def scale_pv(pv_raw, pv_rated):
 
 
 # ============================================================
-# 3. 单场景 MILP 求解(模型与原 h2 一致, 仅 cost 段用 storage_factor)
+# 3. Solve one MILP scenario (original H2 model, with storage_factor applied to costs)
 # ============================================================
 
 def solve_scenario(pv, load, prices, pv_rated, consumption_target, storage_factor=1.0):
     """
-    storage_factor: 电池+整个氢系统(BAT/ELEC/H2/FC CAPEX)同步打折倍数(默认1.0=原价)。
+    storage_factor: shared CAPEX multiplier for BAT/ELEC/H2/FC (default 1.0 = original costs).
     """
     total_pv = sum(pv)
     max_pv = max(pv)
@@ -178,7 +178,7 @@ def solve_scenario(pv, load, prices, pv_rated, consumption_target, storage_facto
     crf_h2 = crf(DISCOUNT_RATE, H2_LIFE)
     crf_fc = crf(DISCOUNT_RATE, FC_LIFE)
 
-    # cost 段: 储能四类 CAPEX 同步乘 storage_factor; PV/电网不变
+    # Scale all four storage CAPEX terms by storage_factor; retain PV and grid costs.
     cost_pv = (crf_pv + PV_OM_RATE) * PV_CAPEX * pv_rated
     cost_bat = (crf_bat + BAT_OM_RATE) * (BAT_CAPEX * storage_factor) * E_BAT_MAX
     cost_elec = (crf_elec + ELEC_OM_RATE) * (ELEC_CAPEX * storage_factor) * P_ELEC_CAP
@@ -272,7 +272,7 @@ def solve_scenario(pv, load, prices, pv_rated, consumption_target, storage_facto
 
 
 # ============================================================
-# 4. 结果保存
+# 4. Save results
 # ============================================================
 
 def save_to_excel(results, filename=None):
@@ -295,7 +295,7 @@ def save_to_excel(results, filename=None):
     ws.append(headers)
 
     for r in results:
-        # 过滤氢储能为0(h2_on=0, 三设备同步=0)
+        # Exclude cases with no hydrogen system (h2_on=0 and all three component capacities equal to zero).
         if r["elec_cap_kW"] == 0 and r["fc_cap_kW"] == 0 and r["h2_tank_kg"] == 0:
             continue
         ws.append([
@@ -314,11 +314,11 @@ def save_to_excel(results, filename=None):
 
     wb.save(filename)
     wb.close()
-    print(f"结果已保存到 {filename}")
+    print(f"Results saved to {filename}")
 
 
 # ============================================================
-# 5. 可视化(按 storage_factor)
+# 5. Visualization by storage_factor
 # ============================================================
 
 def plot_results(results):
@@ -405,17 +405,17 @@ def plot_results(results):
     fig_lcoe.savefig(os.path.join(out_dir, "plot_joint_lcoe_sensitivity.png"), dpi=150)
     plt.close(fig_lcoe)
 
-    print("图表已保存: plot_joint_lcoe_vs_penetration.png, plot_joint_lcoe_vs_pv.png, "
+    print("Figures saved: plot_joint_lcoe_vs_penetration.png, plot_joint_lcoe_vs_pv.png, "
           "plot_joint_elec_cap_sensitivity.png, plot_joint_h2_tank_sensitivity.png, "
           "plot_joint_fc_cap_sensitivity.png, plot_joint_lcoe_sensitivity.png")
 
 
 # ============================================================
-# 6. 主程序
+# 6. Main program
 # ============================================================
 
 if __name__ == "__main__":
-    print("正在读取数据...")
+    print("Loading data...")
     pv_raw, load_data = load_raw_data()
     prices = build_prices()
 
@@ -430,9 +430,9 @@ if __name__ == "__main__":
     n_ok = 0
     t_start = time.time()
 
-    print(f"扫描(joint 储能同步打折): {n_pv} PV × {n_ct} 消纳率 × {n_sf} storage_factor = {n_total} 场景")
-    print(f"PV范围: {PV_SCAN_MIN/1000:.1f}~{PV_SCAN_MAX/1000:.0f} MW, 步长 {PV_SCAN_STEP/1000:.1f} MW")
-    print(f"storage_factor(电池+整个氢系统 同步): {STORAGE_PRICE_FACTORS}")
+    print(f"Scan (joint storage cost scaling): {n_pv} PV × {n_ct} utilization targets × {n_sf} storage_factor = {n_total} scenarios")
+    print(f"PV range: {PV_SCAN_MIN/1000:.1f}~{PV_SCAN_MAX/1000:.0f} MW, step {PV_SCAN_STEP/1000:.1f} MW")
+    print(f"storage_factor (battery and all hydrogen components): {STORAGE_PRICE_FACTORS}")
     print()
 
     for storage_factor in STORAGE_PRICE_FACTORS:
@@ -445,8 +445,8 @@ if __name__ == "__main__":
                     elapsed = time.time() - t_start
                     rate = n_done / elapsed if elapsed > 0 else 0
                     eta = (n_total - n_done) / rate if rate > 0 else 0
-                    print(f"  进度 {n_done}/{n_total} ({n_done/n_total*100:.0f}%)  "
-                          f"可行 {n_ok}  已用 {elapsed:.0f}s  剩余 ~{eta:.0f}s")
+                    print(f"  Progress {n_done}/{n_total} ({n_done/n_total*100:.0f}%)  "
+                          f"Feasible {n_ok}  Elapsed {elapsed:.0f}s  Remaining ~{eta:.0f}s")
 
                 r = solve_scenario(pv, load_data, prices, pv_kw, ct, storage_factor=storage_factor)
                 if r is not None:
@@ -454,11 +454,11 @@ if __name__ == "__main__":
                     n_ok += 1
 
     elapsed = time.time() - t_start
-    print(f"\n扫描完成: {n_ok}/{n_total} 可行, 耗时 {elapsed:.1f}s")
+    print(f"\nScan complete: {n_ok}/{n_total} feasible, elapsed {elapsed:.1f}s")
 
     if all_results:
         all_results.sort(key=lambda r: (r["storage_factor"], r["PV_MW"], r["cons_target_pct"]))
         save_to_excel(all_results)
         plot_results(all_results)
     else:
-        print("无可行解, 请检查参数设置")
+        print("No feasible solution; check the parameter settings")

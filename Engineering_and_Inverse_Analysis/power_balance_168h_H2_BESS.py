@@ -1,16 +1,16 @@
 """
-绿氢微电网168小时离网测试数据可视化 - 功率平衡图 (Nature风格)
-H2+BESS配置版本：无风电，新能源仅光伏
+Visualize a 168-hour off-grid green-hydrogen microgrid test: power balance (Nature style).
+H2+BESS configuration with PV generation and no wind power.
 
-包含3个子图：功率平衡曲线图、储能状态对比图（双y轴）、每日充放电比例柱状图
+Three panels show power balance, storage states on dual y axes, and daily charging/discharging shares.
 
-数据源（与本脚本位于同一目录）：seven_day_offgrid_H2_BESS.xlsx
+Data sources (in the same directory as this script):seven_day_offgrid_H2_BESS.xlsx
 
-4条功率曲线：
-- Renewable Gen = 光伏（正值）
-- Storage Output = 电池放电 - 电池充电（正/负）
-- Fuel Cell Output/H2 Production = 燃料电池 - 制氢（正/负）
-- Load = 负荷（负值）
+Four power curves:
+- Renewable Gen = PV (positive)
+- Storage Output = battery discharge minus battery charge (positive/negative)
+- Fuel Cell Output/H2 Production = fuel cell output minus electrolyzer input (positive/negative)
+- Load = load (negative)
 """
 
 import numpy as np
@@ -20,12 +20,12 @@ from matplotlib import gridspec
 import os
 from pathlib import Path
 
-# ==================== 配置 ====================
+# ==================== Configuration ====================
 SCRIPT_DIR = Path(__file__).resolve().parent
 DATA_PATH = SCRIPT_DIR / "seven_day_offgrid_H2_BESS.xlsx"
 OUTPUT_PATH = SCRIPT_DIR / "figures"
 
-# 4条曲线配色方案
+# Colours for the four curves
 COLORS = {
     'renewable_gen': '#FFA500',
     'storage_output': '#5287BC',
@@ -36,12 +36,12 @@ COLORS = {
 }
 
 
-# ==================== 主绘图函数 ====================
+# ==================== Main plotting function ====================
 
 def plot_figure():
-    """生成图1：功率平衡堆叠图 + 储能状态对比图 + 每日充放电比例柱状图"""
+    """Create Figure 1: power balance, storage states and daily charging/discharging shares."""
 
-    # ==================== 出版级别配置 ====================
+    # ==================== Publication figure settings ====================
     plt.rcParams.update({
         'font.family': 'Arial',
         'font.size': 10,
@@ -67,38 +67,38 @@ def plot_figure():
         'axes.labelcolor': '#000000',
     })
 
-    print("读取数据...")
+    print("Reading data...")
     df = pd.read_excel(DATA_PATH, sheet_name='SimulationResults', header=0)
     N_POINTS = len(df)
     t = df['Time_h'].values
 
-    # ========== 计算4条曲线 ==========
-    # 1. Renewable Gen = 光伏（正值）
+    # ========== Calculate the four curves ==========
+    # 1. Renewable Gen = PV (positive)
     renewable_gen = df['PV_kW'].values
 
-    # 2. Storage Output = -Battery_kW（电池正号=充电，取负后正号=放电）
+    # 2. Storage Output = -Battery_kW(battery power is positive for charging; negation makes discharge positive)
     storage_output = -df['Battery_kW'].values
 
     # 3. Fuel Cell Output/H2 Production = FuelCell - Electrolyzer
     fuelcell_h2 = df['FuelCell_kW'].values - df['Electrolyzer_kW'].values
 
-    # 4. Load = -Load_kW（负值）
+    # 4. Load = -Load_kW(negative)
     load_total = -df['Load_kW'].values
 
-    # 储能状态
+    # Storage states
     battery_soc = df['Battery_SOC_pct'].values
     h2_soc = df['H2_SOC_pct'].values
 
-    print(f"  数据读取完成，共 {N_POINTS} 个时间点")
+    print(f"  Data loaded: {N_POINTS} time points")
 
-    # ==================== 创建图表 ====================
-    print("生成图1 (Nature风格)...")
+    # ==================== Create the figure ====================
+    print("Generating Figure 1 (Nature style)...")
 
     fig = plt.figure(figsize=(15.4, 9.5), dpi=300)
     gs = gridspec.GridSpec(3, 1, height_ratios=[1.6, 0.5, 0.5], hspace=0.30,
                            left=0.09, right=0.72, top=0.94, bottom=0.10)
 
-    # ========== 子图(a): 功率平衡曲线图 ==========
+    # ========== Panel (a): power balance ==========
     ax1 = fig.add_subplot(gs[0])
 
     ax1.plot(t, renewable_gen, color=COLORS['renewable_gen'], linewidth=3.6,
@@ -124,7 +124,7 @@ def plot_figure():
     ax1.legend(bbox_to_anchor=(1.10, 0.5), loc='center left', fontsize=7,
                frameon=True, fancybox=False, edgecolor='#CCCCCC', framealpha=0.9)
 
-    # ========== 子图(b): 储能状态对比 ==========
+    # ========== Panel (b): comparison of storage states ==========
     ax2 = fig.add_subplot(gs[1])
 
     # Battery SOC
@@ -151,23 +151,23 @@ def plot_figure():
     ax2.legend(bbox_to_anchor=(1.10, 0.5), loc='center left', fontsize=7,
                frameon=True, fancybox=False, edgecolor='#CCCCCC', framealpha=0.9)
 
-    # ========== 子图(c): 每日充放电比例柱状图 ==========
+    # ========== Panel (c): daily charging/discharging shares ==========
     ax3 = fig.add_subplot(gs[2])
 
     battery_kw = df['Battery_kW'].values
     fc_kw = df['FuelCell_kW'].values
     elec_kw = df['Electrolyzer_kW'].values
 
-    # 功率小于1的部分置为0
+    # Set power values below 1 to zero
     battery_kw = np.where(np.abs(battery_kw) < 1, 0, battery_kw)
     fc_kw = np.where(np.abs(fc_kw) < 1, 0, fc_kw)
     elec_kw = np.where(np.abs(elec_kw) < 1, 0, elec_kw)
 
-    # Battery_kW>0 = 充电，<0 = 放电
+    # Battery_kW > 0 means charging; < 0 means discharging
     batt_charge = np.where(battery_kw > 0, battery_kw, 0)
     batt_discharge = np.where(battery_kw < 0, -battery_kw, 0)
 
-    pts_per_day = 48  # 0.5h间隔，每天48个点
+    pts_per_day = 48  # 0.5 h intervals, 48 points per day
     n_days = N_POINTS // pts_per_day
 
     daily_batt_c, daily_batt_d, daily_h2, daily_fc = [], [], [], []
@@ -178,9 +178,9 @@ def plot_figure():
         daily_fc.append(np.sum(fc_kw[s:e]) * 0.5)
         daily_h2.append(np.sum(elec_kw[s:e]) * 0.5)
 
-    # 充电侧：电池充电 + 制氢
+    # Charging side: battery charging plus hydrogen production
     c_total = [b + h for b, h in zip(daily_batt_c, daily_h2)]
-    # 放电侧：电池放电 + 燃料电池
+    # Discharging side: battery discharge plus fuel cell output
     d_total = [b + f for b, f in zip(daily_batt_d, daily_fc)]
 
     c_batt_pct = [b / t * 100 if t > 0 else 0 for b, t in zip(daily_batt_c, c_total)]
@@ -192,13 +192,13 @@ def plot_figure():
     w = 0.3
     gap = 0.08
 
-    # 充电柱（实色，偏左）
+    # Charging bars (solid, shifted left)
     ax3.bar(days - w/2 - gap/2, c_batt_pct, width=w, color=COLORS['storage_output'],
             edgecolor='white', linewidth=0.5, label='Battery (Charge)')
     ax3.bar(days - w/2 - gap/2, c_h2_pct, width=w, bottom=c_batt_pct, color=COLORS['fuelcell_h2'],
             edgecolor='white', linewidth=0.5, label='H$_2$ Prod. (Charge)')
 
-    # 放电柱（斜线填充，偏右）
+    # Discharging bars (hatched, shifted right)
     ax3.bar(days + w/2 + gap/2, d_batt_pct, width=w, color=COLORS['storage_output'],
             hatch='//', edgecolor='white', linewidth=0.5, label='Battery (Discharge)')
     ax3.bar(days + w/2 + gap/2, d_fc_pct, width=w, bottom=d_batt_pct, color=COLORS['fuelcell_h2'],
@@ -216,20 +216,20 @@ def plot_figure():
     ax3.legend(bbox_to_anchor=(1.10, 0.5), loc='center left', fontsize=7,
                frameon=True, fancybox=False, edgecolor='#CCCCCC', framealpha=0.9)
 
-    # 打印每日比例
-    print(f"\n========== 每日充放电比例 ==========")
+    # Print daily shares
+    print(f"\n========== Daily charging/discharging shares ==========")
     for i in range(n_days):
-        print(f"  Day {i+1} 放电: Battery={daily_batt_d[i]:.1f} kWh ({d_batt_pct[i]:.1f}%), "
+        print(f"  Day {i+1} discharging: Battery={daily_batt_d[i]:.1f} kWh ({d_batt_pct[i]:.1f}%), "
               f"Fuel Cell={daily_fc[i]:.1f} kWh ({d_fc_pct[i]:.1f}%)")
-        print(f"  Day {i+1} 充电: Battery={daily_batt_c[i]:.1f} kWh ({c_batt_pct[i]:.1f}%), "
+        print(f"  Day {i+1} charging: Battery={daily_batt_c[i]:.1f} kWh ({c_batt_pct[i]:.1f}%), "
               f"H2 Prod.={daily_h2[i]:.1f} kWh ({c_h2_pct[i]:.1f}%)")
 
-    # 保存图表
+    # Save the figure
     os.makedirs(OUTPUT_PATH, exist_ok=True)
     plt.savefig(OUTPUT_PATH / "figure1_power_balance_H2_BESS.svg", bbox_inches='tight')
     plt.savefig(OUTPUT_PATH / "figure1_power_balance_H2_BESS.png", dpi=300, bbox_inches='tight')
 
-    print(f"\n图1已保存到 {OUTPUT_PATH}/")
+    print(f"\nFigure 1 saved to {OUTPUT_PATH}/")
     print("  - figure1_power_balance_H2_BESS.svg")
     print("  - figure1_power_balance_H2_BESS.png")
 
@@ -238,4 +238,4 @@ def plot_figure():
 
 if __name__ == "__main__":
     plot_figure()
-    print("\n完成!")
+    print("\nCompleted!")

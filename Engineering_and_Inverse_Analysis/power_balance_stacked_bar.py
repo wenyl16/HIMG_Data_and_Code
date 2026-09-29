@@ -1,10 +1,10 @@
 """
-绿氢微电网一天运行数据可视化 - 功率平衡堆叠柱状图 (Nature Style)
-晴天和阴天每小时各资源功率堆叠柱状图（正向=供给，负向=需求）
-每个功率图下方附带储能状态百分比图（双y轴）
+Visualize one day of green-hydrogen microgrid operation: stacked power balance (Nature style).
+Stacked resource power for sunny and cloudy days (positive = supply, negative = demand).
+Storage-state percentages appear below each power panel, using dual y axes.
 
-数据源（与本脚本位于同一目录）：typical_sunny_day.xlsx,
-typical_cloudy_day.xlsx（半小时间隔，48个点）
+Data sources (in the same directory as this script):typical_sunny_day.xlsx,
+typical_cloudy_day.xlsx(half-hour intervals, 48 points)
 """
 
 import numpy as np
@@ -15,7 +15,7 @@ from scipy.interpolate import CubicSpline
 import os
 from pathlib import Path
 
-# ==================== 配置 ====================
+# ==================== Configuration ====================
 SCRIPT_DIR = Path(__file__).resolve().parent
 DATA_PATH = SCRIPT_DIR
 OUTPUT_PATH = SCRIPT_DIR / "figures"
@@ -48,7 +48,7 @@ def read_daily_data(filename):
         df = pd.read_excel(DATA_PATH / filename)
         return df
     except Exception as e:
-        print(f"读取文件 {filename} 失败: {e}")
+        print(f"Failed to read {filename}: {e}")
         return None
 
 
@@ -56,24 +56,24 @@ def compute_hourly_data(df):
     n = min(len(df), 48)
 
     pv = df['pv'].values[:n]
-    grid_purchase = df.get('购电功率', pd.Series([0]*len(df))).values[:n]
-    battery_discharge = df['电化学储能放电'].values[:n]
-    battery_charge = df['电化学储能充电'].values[:n]
-    fuel_cell = df['燃料电池放电'].values[:n]
-    h2_production = df['制氢功率'].values[:n]
-    charging_station = df['充电桩负荷'].values[:n]
-    dc_station_load = df['直流和站用负荷'].values[:n]
+    grid_purchase = df.get('grid_purchase_kw', pd.Series([0]*len(df))).values[:n]
+    battery_discharge = df['battery_discharge_kw'].values[:n]
+    battery_charge = df['battery_charge_kw'].values[:n]
+    fuel_cell = df['fuel_cell_kw'].values[:n]
+    h2_production = df['electrolyzer_kw'].values[:n]
+    charging_station = df['ev_charging_load_kw'].values[:n]
+    dc_station_load = df['dc_station_load_kw'].values[:n]
     ess_soc = df['ess_soc'].values[:n]
     h_soc = df['h_soc'].values[:n]
     h_load = df['h_load'].values[:n]
-    pv_grid_feed = df.get('光伏上网', pd.Series([0]*len(df))).values[:n]
+    pv_grid_feed = df.get('pv_export_kw', pd.Series([0]*len(df))).values[:n]
 
     renewable_gen = pv
     storage_output = battery_discharge - battery_charge
     fuelcell_h2 = fuel_cell - h2_production
     load_total = -(charging_station + dc_station_load)
 
-    # 虚拟百分比：不加氢 = h_soc + cumsum(h_load)，再除以450
+    # Hypothetical storage fraction without hydrogen refuelling: (h_soc + cumsum(h_load)) / 450
     h_soc_virtual = h_soc + np.cumsum(h_load)
 
     return {
@@ -120,7 +120,7 @@ def plot_stacked_bars(ax, data, n_points, panel_label):
     neg_fc = np.minimum(d['fuelcell_h2'], 0)
     neg_pv_feed = -d.get('pv_grid_feed', np.zeros(n_points))
 
-    # 正向堆叠 (supply)
+    # Positive stack (supply)
     ax.bar(bar_centers, pos_ren, bw, color=COLORS['renewable_gen'],
            label='Renewable Gen', edgecolor='white', linewidth=0.3)
     ax.bar(bar_centers, pos_grid, bw, bottom=pos_ren, color=COLORS['grid'],
@@ -132,7 +132,7 @@ def plot_stacked_bars(ax, data, n_points, panel_label):
            color=COLORS['fuelcell_h2'], label='Fuel Cell / H$_2$ Prod.',
            edgecolor='white', linewidth=0.3)
 
-    # 负向堆叠 (demand)
+    # Negative stack (demand)
     ax.bar(bar_centers, neg_load, bw, color=COLORS['load'],
            label='Load', edgecolor='white', linewidth=0.3)
     ax.bar(bar_centers, neg_pv_feed, bw, bottom=neg_load,
@@ -181,7 +181,7 @@ def plot_h2_soc(ax, h_soc_pct, h_load, n_points, panel_label,
     h2_color = '#0F7057'
     refuel_color = '#7FBDA8'
 
-    # 左轴：实际储氢百分比 — 实线 + 半透明填充
+    # Left axis: actual hydrogen-storage percentage, with a solid line and translucent fill
     y_h2_smooth = safe_spline(bar_centers, h_soc_pct, t_smooth)
     ax.plot(t_smooth, y_h2_smooth, color=h2_color, linewidth=2.0,
             label='H$_2$ SOC', solid_capstyle='round')
@@ -193,7 +193,7 @@ def plot_h2_soc(ax, h_soc_pct, h_load, n_points, panel_label,
     ax.tick_params(axis='y', labelcolor=h2_color, labelsize=9,
                    width=0.8, length=4)
 
-    # 右轴：加氢量柱子
+    # Right axis: hydrogen-refuelling bars
     ax_right = ax.twinx()
     refuel_mask = h_load > 0
     if np.any(refuel_mask):
@@ -208,7 +208,7 @@ def plot_h2_soc(ax, h_soc_pct, h_load, n_points, panel_label,
     ax_right.tick_params(axis='y', labelcolor=refuel_color, labelsize=9,
                         width=0.8, length=4)
 
-    # 100% 参考线
+    # 100% reference line
     ax.axhline(y=100, color='#888888', linestyle='--', linewidth=1.0, zorder=1)
 
     setup_xaxis(ax, show_labels=show_xlabel)
@@ -216,7 +216,7 @@ def plot_h2_soc(ax, h_soc_pct, h_load, n_points, panel_label,
 
 
 def main():
-    # ── Nature 出版级 rcParams ──────────────────────────────────────────────
+    # ── Nature-style publication rcParams ──────────────────────────────────────────────
     # MANDATORY: editable SVG text
     plt.rcParams['font.family'] = 'sans-serif'
     plt.rcParams['font.sans-serif'] = ['Arial', 'DejaVu Sans', 'Liberation Sans']
@@ -238,45 +238,45 @@ def main():
     plt.rcParams['xtick.major.size'] = 5.25
     plt.rcParams['ytick.major.size'] = 5.25
 
-    # ── 读取数据 ────────────────────────────────────────────────────────────
+    # ── Read data ────────────────────────────────────────────────────────────
     df_sunny = read_daily_data("typical_sunny_day.xlsx")
     df_cloudy = read_daily_data("typical_cloudy_day.xlsx")
 
     if df_sunny is None or df_cloudy is None:
-        print("数据读取失败！")
+        print("Failed to load data!")
         return
 
     data_sunny, n_h1 = compute_hourly_data(df_sunny)
     data_cloudy, n_h2 = compute_hourly_data(df_cloudy)
 
-    print(f"晴天：{n_h1} 个点，阴天：{n_h2} 个点")
+    print(f"Sunny day: {n_h1} points; cloudy day: {n_h2} points")
 
-    # ── 创建图表 (3×2: 左列晴天, 右列阴天) ─────────────────────────────────
+    # ── Create a 3-by-2 figure: sunny day on the left, cloudy day on the right ─────────────────────────────────
     fig = plt.figure(figsize=(32, 11.2), dpi=300)
     gs = gridspec.GridSpec(3, 2, height_ratios=[1.6, 0.4, 0.5],
                            hspace=0.30, wspace=0.25,
                            left=0.07, right=0.66, top=0.95, bottom=0.06)
 
-    ax_p1 = fig.add_subplot(gs[0, 0])   # 晴天功率
-    ax_b1 = fig.add_subplot(gs[1, 0])   # 晴天Battery SOC
-    ax_h1 = fig.add_subplot(gs[2, 0])   # 晴天H2 SOC
-    ax_p2 = fig.add_subplot(gs[0, 1])   # 阴天功率
-    ax_b2 = fig.add_subplot(gs[1, 1])   # 阴天Battery SOC
-    ax_h2 = fig.add_subplot(gs[2, 1])   # 阴天H2 SOC
+    ax_p1 = fig.add_subplot(gs[0, 0])   # Sunny-day power
+    ax_b1 = fig.add_subplot(gs[1, 0])   # Sunny-day battery SOC
+    ax_h1 = fig.add_subplot(gs[2, 0])   # Sunny-day H2 SOC
+    ax_p2 = fig.add_subplot(gs[0, 1])   # Cloudy-day power
+    ax_b2 = fig.add_subplot(gs[1, 1])   # Cloudy-day battery SOC
+    ax_h2 = fig.add_subplot(gs[2, 1])   # Cloudy-day H2 SOC
 
-    # ---- 晴天 (左列) ----
+    # ---- Sunny day (left column) ----
     plot_stacked_bars(ax_p1, data_sunny['power'], n_h1, 'a')
     plot_battery_soc(ax_b1, data_sunny['ess_soc_pct'], n_h1, 'b')
     plot_h2_soc(ax_h1, data_sunny['h_soc_pct'],
                 data_sunny['h_load'], n_h1, 'c', show_xlabel=True)
 
-    # ---- 阴天 (右列) ----
+    # ---- Cloudy day (right column) ----
     plot_stacked_bars(ax_p2, data_cloudy['power'], n_h2, 'd')
     plot_battery_soc(ax_b2, data_cloudy['ess_soc_pct'], n_h2, 'e')
     plot_h2_soc(ax_h2, data_cloudy['h_soc_pct'],
                 data_cloudy['h_load'], n_h2, 'f', show_xlabel=True)
 
-    # ---- 统一图例（功率 + SOC 合并，去重）----
+    # ---- Shared legend: combine power and SOC entries and remove duplicates----
     all_handles, all_labels = [], []
     for ax in [ax_p1, ax_b1, ax_h1]:
         h, l = ax.get_legend_handles_labels()
@@ -287,18 +287,18 @@ def main():
                bbox_to_anchor=(0.68, 0.5), loc='center left', fontsize=9,
                frameon=False)
 
-    # ── 导出 ────────────────────────────────────────────────────────────────
+    # ── Export ────────────────────────────────────────────────────────────────
     os.makedirs(OUTPUT_PATH, exist_ok=True)
     base = OUTPUT_PATH / "figure_stacked_bar_hourly"
     fig.savefig(base.with_suffix('.svg'), bbox_inches='tight')
     fig.savefig(base.with_suffix('.png'), dpi=300, bbox_inches='tight')
     plt.close(fig)
 
-    print(f"图表已保存到 {OUTPUT_PATH}/")
+    print(f"Figure saved to {OUTPUT_PATH}/")
     print(f"  - {base}.svg")
     print(f"  - {base}.png")
 
 
 if __name__ == "__main__":
     main()
-    print("\n完成!")
+    print("\nCompleted!")

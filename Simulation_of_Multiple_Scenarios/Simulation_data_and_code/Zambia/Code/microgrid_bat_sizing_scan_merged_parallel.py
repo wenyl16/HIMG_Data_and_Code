@@ -1,14 +1,14 @@
 """
-Zambia 矿区 PV+电池容量优化 —— merged/brownfield 多进程并行版(含原始电池)
-模型/逻辑/输出与 microgrid_bat_sizing_scan_merged.py 完全一致, 仅主循环并行化。
-与 Norway parallel 同构; 差异: 无 wind、task=(factor, pv_kw, ct)、读 3 元组。
+Zambia mining PV-battery sizing: merged/brownfield multiprocessing version retaining the existing battery
+Model, logic, and output match microgrid_bat_sizing_scan_merged.py; only the main loop is parallelized.
+Same structure as Norway parallel; no wind, tasks are (factor, pv_kw, ct), and the loader returns three values.
 
-用法:
+Usage:
     python microgrid_bat_sizing_scan_merged_parallel.py
     N_WORKERS=32 python microgrid_bat_sizing_scan_merged_parallel.py
 """
 import os
-# 清掉 v10 商业许可证相关环境变量, 强制使用 gurobipy 13 自带学术许可证
+# Clear environment settings for the v10 commercial license to use the gurobipy 13 academic license setup.
 for _k in list(os.environ):
     if "GRB" in _k or "GUROBI" in _k:
         os.environ.pop(_k, None)
@@ -32,7 +32,7 @@ _W = {}
 
 
 def _init_worker():
-    """每个工作进程启动时执行一次: 限定单线程 + 载入数据。"""
+    """Initialize each worker once: limit solver threads and load the data."""
     gp.setParam("OutputFlag", 0)
     gp.setParam("Threads", 1)
     pv_raw, load, prices = base.load_raw_data()
@@ -54,14 +54,14 @@ def _checkpoint(results, out_dir):
             filename=os.path.join(out_dir, "sensitivity_bat_sizing_merged_checkpoint.xlsx"),
         )
     except Exception as e:
-        print(f"  [warn] 检查点写入失败: {e}")
+        print(f"  [warn] Could not write checkpoint: {e}")
 
 
 if __name__ == "__main__":
     out_dir = os.path.dirname(os.path.abspath(__file__))
     t_start = time.time()
 
-    # 主进程读一次数据算 avg_load_mw (供 plot_results 时长图用; worker 各自再读)
+    # Load data once in the parent to compute avg_load_mw for duration plots; each worker loads its own data.
     _, load_main, _ = base.load_raw_data()
     avg_load_mw = sum(load_main) / len(load_main) / 1000
 
@@ -74,9 +74,9 @@ if __name__ == "__main__":
     n_total = len(tasks)
     n_workers = min(N_WORKERS, n_total)
 
-    print(f"并行扫描(Zambia PV+电池): {n_total} 场景, 使用 {n_workers} 进程(每进程1线程)")
-    print(f"PV: {base.PV_SCAN_MIN}~{base.PV_SCAN_MAX} kW, 步长 {base.PV_SCAN_STEP} kW, "
-          f"共 {len(pv_values)} 档")
+    print(f"Parallel scan (Zambia PV + battery): {n_total} scenarios, using {n_workers} processes (one thread per process)")
+    print(f"PV: {base.PV_SCAN_MIN}~{base.PV_SCAN_MAX} kW, step {base.PV_SCAN_STEP} kW, "
+          f"total {len(pv_values)} capacity levels")
     print()
 
     results = []
@@ -93,17 +93,17 @@ if __name__ == "__main__":
             elapsed = time.time() - t_start
             rate = n_done / elapsed if elapsed > 0 else 0
             eta = (n_total - n_done) / rate if rate > 0 else 0
-            print(f"  进度 {n_done}/{n_total} ({n_done/n_total*100:.0f}%)  "
-                  f"可行 {n_ok}  已用 {elapsed:.0f}s  剩余 ~{eta:.0f}s")
+            print(f"  Progress {n_done}/{n_total} ({n_done/n_total*100:.0f}%)  "
+                  f"feasible {n_ok}  elapsed {elapsed:.0f}s  remaining ~{eta:.0f}s")
 
         if r is not None and n_ok > 0 and n_ok % CHECKPOINT_EVERY == 0:
             _checkpoint(results, out_dir)
 
-    # --- 边界精细化补跑: 对每个(factor,ct)在 energy_pen>=WALL_PEN_ENTER 区间以 WALL_FINE_STEP 加密 ---
+    # Refine each (factor, ct) group with WALL_FINE_STEP where energy_pen>=WALL_PEN_ENTER.
     fine_tasks = base.boundary_fine_tasks(results)
     n_fine_ok = 0
     if fine_tasks:
-        print(f"\n边界精细化: {len(fine_tasks)} 个补充任务 (步长 {base.WALL_FINE_STEP} kW, "
+        print(f"\nBoundary refinement: {len(fine_tasks)} additional tasks (step {base.WALL_FINE_STEP} kW, "
               f"pen>={base.WALL_PEN_ENTER*100:.0f}%)", flush=True)
         nf_done = 0
         for r in pool.imap_unordered(_worker, fine_tasks):
@@ -112,15 +112,15 @@ if __name__ == "__main__":
                 results.append(r)
                 n_fine_ok += 1
             if nf_done % 50 == 0 or nf_done == len(fine_tasks):
-                print(f"  细化进度 {nf_done}/{len(fine_tasks)}  可行 {n_fine_ok}", flush=True)
-        print(f"边界精细化完成: 可行 {n_fine_ok}/{len(fine_tasks)}", flush=True)
+                print(f"  Refinement progress {nf_done}/{len(fine_tasks)}  feasible {n_fine_ok}", flush=True)
+        print(f"Boundary refinement complete: feasible {n_fine_ok}/{len(fine_tasks)}", flush=True)
 
     results.sort(key=lambda r: (r["bat_price_factor"], r["PV_MW"], r["cons_target_pct"]))
 
     elapsed = time.time() - t_start
-    print(f"\n扫描完成: 粗扫可行 {n_ok}/{n_total} + 细化可行 {n_fine_ok}, 耗时 {elapsed:.1f}s")
+    print(f"\nScan complete: coarse feasible {n_ok}/{n_total} + refinement feasible {n_fine_ok}, elapsed {elapsed:.1f}s")
 
-    # 先关闭 worker 池并释放所有子进程句柄, 再保存 (避免 save 时文件句柄被占)
+    # Close workers and release subprocess handles before saving to avoid open file handles.
     pool.close()
     pool.join()
     for _p in list(getattr(pool, "_pool", [])):
@@ -135,14 +135,14 @@ if __name__ == "__main__":
             base.plot_results(results, avg_load_mw=avg_load_mw)
         except PermissionError as e:
             alt = os.path.join(out_dir, "sensitivity_bat_sizing_merged_results_parallel.xlsx")
-            print(f"[warn] 主结果文件被占用({e}), 改写到 {alt}")
+            print(f"[warn] Main result file is in use ({e}); writing to {alt}")
             base.save_to_excel(results, filename=alt)
             base.plot_results(results, avg_load_mw=avg_load_mw)
         cp = os.path.join(out_dir, "sensitivity_bat_sizing_merged_checkpoint.xlsx")
         if os.path.exists(cp):
             os.remove(cp)
-            print("已清理检查点文件")
+            print("Checkpoint file removed")
     else:
-        print("无可行解, 请检查参数设置")
+        print("No feasible solution; check the parameters")
 
     os._exit(0)

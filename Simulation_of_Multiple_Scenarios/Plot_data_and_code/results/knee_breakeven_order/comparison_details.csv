@@ -1,61 +1,61 @@
-﻿scenario,consumption_target_%,scenario_zh,method,method_label,flexibility_knee_penetration_%,economic_breakeven_penetration_%,economic_breakeven_duration_h,economic_minus_flexibility_pp,order,order_zh,economic_crossover_status
-Industrial,60,工业,maximum_curvature,最大曲率法,88.6333000000,99.7364370614,59.1460715992,11.1031370614,ahead,领先,crossover
-Industrial,60,工业,kneedle,Kneedle,92.9794000000,99.7364370614,59.1460715992,6.7570370614,ahead,领先,crossover
-Industrial,60,工业,L_method,L_method,91.3078000000,99.7364370614,59.1460715992,8.4286370614,ahead,领先,crossover
-Industrial,70,工业,maximum_curvature,最大曲率法,86.9617000000,97.3490102848,39.3590672752,10.3873102848,ahead,领先,crossover
-Industrial,70,工业,kneedle,Kneedle,90.6392000000,97.3490102848,39.3590672752,6.7098102848,ahead,领先,crossover
-Industrial,70,工业,L_method,L_method,90.6392000000,97.3490102848,39.3590672752,6.7098102848,ahead,领先,crossover
-Industrial,80,工业,maximum_curvature,最大曲率法,82.9517000000,90.0589208613,27.5157042179,7.1072208613,ahead,领先,crossover
-Industrial,80,工业,kneedle,Kneedle,85.6259000000,90.0589208613,27.5157042179,4.4330208613,ahead,领先,crossover
-Industrial,80,工业,L_method,L_method,86.6288000000,90.0589208613,27.5157042179,3.4301208613,ahead,领先,crossover
-Industrial,90,工业,maximum_curvature,最大曲率法,71.5861000000,78.0908120331,20.3191240777,6.5047120331,ahead,领先,crossover
-Industrial,90,工业,kneedle,Kneedle,74.5946000000,78.0908120331,20.3191240777,3.4962120331,ahead,领先,crossover
-Industrial,90,工业,L_method,L_method,75.9318000000,78.0908120331,20.3191240777,2.1590120331,ahead,领先,crossover
-Industrial,100,工业,maximum_curvature,最大曲率法,49.0961000000,52.0840944791,13.5689332171,2.9879944791,ahead,领先,crossover
-Industrial,100,工业,kneedle,Kneedle,53.4326000000,52.0840944791,13.5689332171,-1.3485055209,behind,滞后,crossover
-Industrial,100,工业,L_method,L_method,53.4326000000,52.0840944791,13.5689332171,-1.3485055209,behind,滞后,crossover
-Commercial,60,商业,maximum_curvature,最大曲率法,87.6378000000,98.9475781796,59.3456246532,11.3097781796,ahead,领先,crossover
-Commercial,60,商业,kneedle,Kneedle,91.3130000000,98.9475781796,59.3456246532,7.6345781796,ahead,领先,crossover
-Commercial,60,商业,L_method,L_method,91.3130000000,98.9475781796,59.3456246532,7.6345781796,ahead,领先,crossover
-Commercial,70,商业,maximum_curvature,最大曲率法,85.1308000000,95.8233706524,46.7384461688,10.6925706524,ahead,领先,crossover
-Commercial,70,商业,kneedle,Kneedle,88.1195000000,95.8233706524,46.7384461688,7.7038706524,ahead,领先,crossover
-Commercial,70,商业,L_method,L_method,89.7799000000,95.8233706524,46.7384461688,6.0434706524,ahead,领先,crossover
-Commercial,80,商业,maximum_curvature,最大曲率法,79.7153000000,88.9494913191,35.0017439250,9.2341913191,ahead,领先,crossover
-Commercial,80,商业,kneedle,Kneedle,82.3681000000,88.9494913191,35.0017439250,6.5813913191,ahead,领先,crossover
-Commercial,80,商业,L_method,L_method,84.3578000000,88.9494913191,35.0017439250,4.5916913191,ahead,领先,crossover
-Commercial,90,商业,maximum_curvature,最大曲率法,71.6609000000,79.9252411987,28.1609889231,8.2643411987,ahead,领先,crossover
-Commercial,90,商业,kneedle,Kneedle,74.3217000000,79.9252411987,28.1609889231,5.6035411987,ahead,领先,crossover
-Commercial,90,商业,L_method,L_method,76.3174000000,79.9252411987,28.1609889231,3.6078411987,ahead,领先,crossover
-Commercial,100,商业,maximum_curvature,最大曲率法,57.0911000000,61.4684816970,29.6249307806,4.3773816970,ahead,领先,crossover
-Commercial,100,商业,kneedle,Kneedle,60.0695000000,61.4684816970,29.6249307806,1.3989816970,ahead,领先,crossover
-Commercial,100,商业,L_method,L_method,60.7314000000,61.4684816970,29.6249307806,0.7370816970,ahead,领先,crossover
-Rural,60,乡村,maximum_curvature,最大曲率法,87.3418000000,98.3729503931,44.4981899765,11.0311503931,ahead,领先,crossover
-Rural,60,乡村,kneedle,Kneedle,90.3398000000,98.3729503931,44.4981899765,8.0331503931,ahead,领先,crossover
-Rural,60,乡村,L_method,L_method,92.0054000000,98.3729503931,44.4981899765,6.3675503931,ahead,领先,crossover
-Rural,70,乡村,maximum_curvature,最大曲率法,85.2596000000,95.1079363276,32.8496396664,9.8483363276,ahead,领先,crossover
-Rural,70,乡村,kneedle,Kneedle,87.9197000000,95.1079363276,32.8496396664,7.1882363276,ahead,领先,crossover
-Rural,70,乡村,L_method,L_method,90.2473000000,95.1079363276,32.8496396664,4.8606363276,ahead,领先,crossover
-Rural,80,乡村,maximum_curvature,最大曲率法,81.7997000000,90.3761596719,27.8673819348,8.5764596719,ahead,领先,crossover
-Rural,80,乡村,kneedle,Kneedle,84.4531000000,90.3761596719,27.8673819348,5.9230596719,ahead,领先,crossover
-Rural,80,乡村,L_method,L_method,86.7748000000,90.3761596719,27.8673819348,3.6013596719,ahead,领先,crossover
-Rural,90,乡村,maximum_curvature,最大曲率法,76.1769000000,81.4372401167,23.4871711214,5.2603401167,ahead,领先,crossover
-Rural,90,乡村,kneedle,Kneedle,78.8057000000,81.4372401167,23.4871711214,2.6315401167,ahead,领先,crossover
-Rural,90,乡村,L_method,L_method,80.4487000000,81.4372401167,23.4871711214,0.9885401167,ahead,领先,crossover
-Rural,100,乡村,maximum_curvature,最大曲率法,61.0332000000,52.6727574156,17.9692305627,-8.3604425844,behind,滞后,crossover
-Rural,100,乡村,kneedle,Kneedle,63.6435000000,52.6727574156,17.9692305627,-10.9707425844,behind,滞后,crossover
-Rural,100,乡村,L_method,L_method,64.9487000000,52.6727574156,17.9692305627,-12.2759425844,behind,滞后,crossover
-Island,60,海岛,maximum_curvature,最大曲率法,90.2255000000,,,,no_economic_crossover,分析域内无经济交叉点,no_crossover
-Island,60,海岛,kneedle,Kneedle,95.5675000000,,,,no_economic_crossover,分析域内无经济交叉点,no_crossover
-Island,60,海岛,L_method,L_method,90.8933000000,,,,no_economic_crossover,分析域内无经济交叉点,no_crossover
-Island,70,海岛,maximum_curvature,最大曲率法,86.9683000000,95.8887398446,22.8775778895,8.9204398446,ahead,领先,crossover
-Island,70,海岛,kneedle,Kneedle,90.3097000000,95.8887398446,22.8775778895,5.5790398446,ahead,领先,crossover
-Island,70,海岛,L_method,L_method,90.6439000000,95.8887398446,22.8775778895,5.2448398446,ahead,领先,crossover
-Island,80,海岛,maximum_curvature,最大曲率法,79.9532000000,88.3021736617,13.2828924615,8.3489736617,ahead,领先,crossover
-Island,80,海岛,kneedle,Kneedle,82.6261000000,88.3021736617,13.2828924615,5.6760736617,ahead,领先,crossover
-Island,80,海岛,L_method,L_method,83.9625000000,88.3021736617,13.2828924615,4.3396736617,ahead,领先,crossover
-Island,90,海岛,maximum_curvature,最大曲率法,66.3757000000,74.2252824097,8.0353014942,7.8495824097,ahead,领先,crossover
-Island,90,海岛,kneedle,Kneedle,69.3722000000,74.2252824097,8.0353014942,4.8530824097,ahead,领先,crossover
-Island,90,海岛,L_method,L_method,70.3710000000,74.2252824097,8.0353014942,3.8542824097,ahead,领先,crossover
-Island,100,海岛,maximum_curvature,最大曲率法,46.1554000000,50.0758650651,6.7933499542,3.9204650651,ahead,领先,crossover
-Island,100,海岛,kneedle,Kneedle,49.4196000000,50.0758650651,6.7933499542,0.6562650651,ahead,领先,crossover
-Island,100,海岛,L_method,L_method,49.4196000000,50.0758650651,6.7933499542,0.6562650651,ahead,领先,crossover
+﻿scenario,consumption_target_%,scenario_label,method,method_label,flexibility_knee_penetration_%,economic_breakeven_penetration_%,economic_breakeven_duration_h,economic_minus_flexibility_pp,order,order_label,economic_crossover_status
+Industrial,60,Industrial,maximum_curvature,Maximum curvature,88.6333000000,99.7364370614,59.1460715992,11.1031370614,ahead,Ahead,crossover
+Industrial,60,Industrial,kneedle,Kneedle,92.9794000000,99.7364370614,59.1460715992,6.7570370614,ahead,Ahead,crossover
+Industrial,60,Industrial,L_method,L_method,91.3078000000,99.7364370614,59.1460715992,8.4286370614,ahead,Ahead,crossover
+Industrial,70,Industrial,maximum_curvature,Maximum curvature,86.9617000000,97.3490102848,39.3590672752,10.3873102848,ahead,Ahead,crossover
+Industrial,70,Industrial,kneedle,Kneedle,90.6392000000,97.3490102848,39.3590672752,6.7098102848,ahead,Ahead,crossover
+Industrial,70,Industrial,L_method,L_method,90.6392000000,97.3490102848,39.3590672752,6.7098102848,ahead,Ahead,crossover
+Industrial,80,Industrial,maximum_curvature,Maximum curvature,82.9517000000,90.0589208613,27.5157042179,7.1072208613,ahead,Ahead,crossover
+Industrial,80,Industrial,kneedle,Kneedle,85.6259000000,90.0589208613,27.5157042179,4.4330208613,ahead,Ahead,crossover
+Industrial,80,Industrial,L_method,L_method,86.6288000000,90.0589208613,27.5157042179,3.4301208613,ahead,Ahead,crossover
+Industrial,90,Industrial,maximum_curvature,Maximum curvature,71.5861000000,78.0908120331,20.3191240777,6.5047120331,ahead,Ahead,crossover
+Industrial,90,Industrial,kneedle,Kneedle,74.5946000000,78.0908120331,20.3191240777,3.4962120331,ahead,Ahead,crossover
+Industrial,90,Industrial,L_method,L_method,75.9318000000,78.0908120331,20.3191240777,2.1590120331,ahead,Ahead,crossover
+Industrial,100,Industrial,maximum_curvature,Maximum curvature,49.0961000000,52.0840944791,13.5689332171,2.9879944791,ahead,Ahead,crossover
+Industrial,100,Industrial,kneedle,Kneedle,53.4326000000,52.0840944791,13.5689332171,-1.3485055209,behind,Behind,crossover
+Industrial,100,Industrial,L_method,L_method,53.4326000000,52.0840944791,13.5689332171,-1.3485055209,behind,Behind,crossover
+Commercial,60,Commercial,maximum_curvature,Maximum curvature,87.6378000000,98.9475781796,59.3456246532,11.3097781796,ahead,Ahead,crossover
+Commercial,60,Commercial,kneedle,Kneedle,91.3130000000,98.9475781796,59.3456246532,7.6345781796,ahead,Ahead,crossover
+Commercial,60,Commercial,L_method,L_method,91.3130000000,98.9475781796,59.3456246532,7.6345781796,ahead,Ahead,crossover
+Commercial,70,Commercial,maximum_curvature,Maximum curvature,85.1308000000,95.8233706524,46.7384461688,10.6925706524,ahead,Ahead,crossover
+Commercial,70,Commercial,kneedle,Kneedle,88.1195000000,95.8233706524,46.7384461688,7.7038706524,ahead,Ahead,crossover
+Commercial,70,Commercial,L_method,L_method,89.7799000000,95.8233706524,46.7384461688,6.0434706524,ahead,Ahead,crossover
+Commercial,80,Commercial,maximum_curvature,Maximum curvature,79.7153000000,88.9494913191,35.0017439250,9.2341913191,ahead,Ahead,crossover
+Commercial,80,Commercial,kneedle,Kneedle,82.3681000000,88.9494913191,35.0017439250,6.5813913191,ahead,Ahead,crossover
+Commercial,80,Commercial,L_method,L_method,84.3578000000,88.9494913191,35.0017439250,4.5916913191,ahead,Ahead,crossover
+Commercial,90,Commercial,maximum_curvature,Maximum curvature,71.6609000000,79.9252411987,28.1609889231,8.2643411987,ahead,Ahead,crossover
+Commercial,90,Commercial,kneedle,Kneedle,74.3217000000,79.9252411987,28.1609889231,5.6035411987,ahead,Ahead,crossover
+Commercial,90,Commercial,L_method,L_method,76.3174000000,79.9252411987,28.1609889231,3.6078411987,ahead,Ahead,crossover
+Commercial,100,Commercial,maximum_curvature,Maximum curvature,57.0911000000,61.4684816970,29.6249307806,4.3773816970,ahead,Ahead,crossover
+Commercial,100,Commercial,kneedle,Kneedle,60.0695000000,61.4684816970,29.6249307806,1.3989816970,ahead,Ahead,crossover
+Commercial,100,Commercial,L_method,L_method,60.7314000000,61.4684816970,29.6249307806,0.7370816970,ahead,Ahead,crossover
+Rural,60,Rural,maximum_curvature,Maximum curvature,87.3418000000,98.3729503931,44.4981899765,11.0311503931,ahead,Ahead,crossover
+Rural,60,Rural,kneedle,Kneedle,90.3398000000,98.3729503931,44.4981899765,8.0331503931,ahead,Ahead,crossover
+Rural,60,Rural,L_method,L_method,92.0054000000,98.3729503931,44.4981899765,6.3675503931,ahead,Ahead,crossover
+Rural,70,Rural,maximum_curvature,Maximum curvature,85.2596000000,95.1079363276,32.8496396664,9.8483363276,ahead,Ahead,crossover
+Rural,70,Rural,kneedle,Kneedle,87.9197000000,95.1079363276,32.8496396664,7.1882363276,ahead,Ahead,crossover
+Rural,70,Rural,L_method,L_method,90.2473000000,95.1079363276,32.8496396664,4.8606363276,ahead,Ahead,crossover
+Rural,80,Rural,maximum_curvature,Maximum curvature,81.7997000000,90.3761596719,27.8673819348,8.5764596719,ahead,Ahead,crossover
+Rural,80,Rural,kneedle,Kneedle,84.4531000000,90.3761596719,27.8673819348,5.9230596719,ahead,Ahead,crossover
+Rural,80,Rural,L_method,L_method,86.7748000000,90.3761596719,27.8673819348,3.6013596719,ahead,Ahead,crossover
+Rural,90,Rural,maximum_curvature,Maximum curvature,76.1769000000,81.4372401167,23.4871711214,5.2603401167,ahead,Ahead,crossover
+Rural,90,Rural,kneedle,Kneedle,78.8057000000,81.4372401167,23.4871711214,2.6315401167,ahead,Ahead,crossover
+Rural,90,Rural,L_method,L_method,80.4487000000,81.4372401167,23.4871711214,0.9885401167,ahead,Ahead,crossover
+Rural,100,Rural,maximum_curvature,Maximum curvature,61.0332000000,52.6727574156,17.9692305627,-8.3604425844,behind,Behind,crossover
+Rural,100,Rural,kneedle,Kneedle,63.6435000000,52.6727574156,17.9692305627,-10.9707425844,behind,Behind,crossover
+Rural,100,Rural,L_method,L_method,64.9487000000,52.6727574156,17.9692305627,-12.2759425844,behind,Behind,crossover
+Island,60,Island,maximum_curvature,Maximum curvature,90.2255000000,,,,no_economic_crossover,No economic crossover in the analysed domain,no_crossover
+Island,60,Island,kneedle,Kneedle,95.5675000000,,,,no_economic_crossover,No economic crossover in the analysed domain,no_crossover
+Island,60,Island,L_method,L_method,90.8933000000,,,,no_economic_crossover,No economic crossover in the analysed domain,no_crossover
+Island,70,Island,maximum_curvature,Maximum curvature,86.9683000000,95.8887398446,22.8775778895,8.9204398446,ahead,Ahead,crossover
+Island,70,Island,kneedle,Kneedle,90.3097000000,95.8887398446,22.8775778895,5.5790398446,ahead,Ahead,crossover
+Island,70,Island,L_method,L_method,90.6439000000,95.8887398446,22.8775778895,5.2448398446,ahead,Ahead,crossover
+Island,80,Island,maximum_curvature,Maximum curvature,79.9532000000,88.3021736617,13.2828924615,8.3489736617,ahead,Ahead,crossover
+Island,80,Island,kneedle,Kneedle,82.6261000000,88.3021736617,13.2828924615,5.6760736617,ahead,Ahead,crossover
+Island,80,Island,L_method,L_method,83.9625000000,88.3021736617,13.2828924615,4.3396736617,ahead,Ahead,crossover
+Island,90,Island,maximum_curvature,Maximum curvature,66.3757000000,74.2252824097,8.0353014942,7.8495824097,ahead,Ahead,crossover
+Island,90,Island,kneedle,Kneedle,69.3722000000,74.2252824097,8.0353014942,4.8530824097,ahead,Ahead,crossover
+Island,90,Island,L_method,L_method,70.3710000000,74.2252824097,8.0353014942,3.8542824097,ahead,Ahead,crossover
+Island,100,Island,maximum_curvature,Maximum curvature,46.1554000000,50.0758650651,6.7933499542,3.9204650651,ahead,Ahead,crossover
+Island,100,Island,kneedle,Kneedle,49.4196000000,50.0758650651,6.7933499542,0.6562650651,ahead,Ahead,crossover
+Island,100,Island,L_method,L_method,49.4196000000,50.0758650651,6.7933499542,0.6562650651,ahead,Ahead,crossover

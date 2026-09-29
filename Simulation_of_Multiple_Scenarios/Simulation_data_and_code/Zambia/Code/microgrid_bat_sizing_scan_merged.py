@@ -1,15 +1,15 @@
 """
-Zambia 矿区微网 PV+电池储能容量优化 —— merged/brownfield 版(含原始电池)
+Zambia mining PV-battery microgrid sizing: merged/brownfield version retaining the existing battery
 ======================================================================================
-与 greenfield(microgrid_bat_sizing_scan.py) 的唯一区别:
-  - E_BAT_MAX = 15000 kWh(原始电池地板, Zambia 原有电池 7500kW/15000kWh), E_TOTAL 下界=15000, 功率=E_TOTAL/2(地板功率=7500kW)
-  - BAT_PRICE_FACTORS = [1.0](海外场景仅 1.0 因子)
-  - 电池成本对全部 E_TOTAL 计全 CAPEX(含地板, 整体重定价; 非 sunk-cost)
-数据: Annual_8760.xlsx (sheet PV / Load, 各 2 列 hour-index + kW, 无表头, 8760h)
-系统: PV(扫描, 1MW nameplate 基准) + 单一电池(E_TOTAL 决策变量, 功率=E/2)
-电价: 无电价列 -> 赞比亚 CEC 矿区平价电价 0.15 USD/kWh (flat, 已是USD)
-消纳率: 60~100%; 目标: 最小化年化总成本; 求解器 Gurobi
-与 Norway 差别: 无风电; 双 sheet 无表头读取; 电价 flat USD 无汇率
+Differences from greenfield microgrid_bat_sizing_scan.py:
+  - E_BAT_MAX = 15000 kWh retains the existing 7500 kW/15000 kWh battery; E_TOTAL >= 15000 and power=E_TOTAL/2 (minimum 7500 kW).
+  - BAT_PRICE_FACTORS = [1.0]; overseas scenarios use only the baseline factor.
+  - Apply full CAPEX to all E_TOTAL, including the existing-capacity floor; existing capacity is repriced, not treated as a sunk cost.
+Data: Annual_8760.xlsx; PV and Load sheets, each with hour-index and kW columns, no header, and 8760 hours.
+System: scanned PV capacity referenced to a 1 MW nameplate rating, plus one battery (E_TOTAL decision variable; power=E/2).
+Electricity price: no price column; assume a flat Zambia CEC mining tariff of 0.15 USD/kWh, already in USD.
+Utilization targets: 60%-100%. Objective: minimize annualized total cost. Solver: Gurobi.
+Differences from Norway: no wind, two sheets without headers, and a flat USD tariff requiring no currency conversion.
 """
 
 import os
@@ -24,27 +24,27 @@ import numpy as np
 from scipy.interpolate import PchipInterpolator
 
 # ============================================================
-# 1. 系统参数
+# 1. System parameters
 # ============================================================
 
-# --- 光伏 (1MW nameplate 基准, 实测峰值 830.65kW) ---
-PV_RATED_ORIGINAL = 1000         # kW (nameplate; 数据峰值 830.65 是 ~17% 损耗折减)
+# PV: 1 MW nameplate reference, measured peak 830.65 kW.
+PV_RATED_ORIGINAL = 1000         # kW: nameplate rating; the measured 830.65 kW peak reflects approximately 17% losses.
 PV_CAPEX = 658                   # $/kW (nameplate)
 PV_LIFE = 25
 PV_OM_RATE = 0.015
 
-# --- PV 扫描 (nameplate kW) ---
-PV_SCAN_MIN = 50                # 与 greenfield 一致(原 brownfield 9000 不可行): 9000 在 ct>=80% 物理不可行(年发14.6GWh=1.29×负荷11.3GWh; ct=100% 上限≈6956kW<9000); 降到50 使各 ct 都有可行点; brownfield 由 E_BAT_MAX=15000 体现
-PV_SCAN_MAX = 13000              # 上调以覆盖 ct=60% 达 pen≈100% (需11.6MW)
-PV_SCAN_STEP = 50                # 细步长(原250)以抓各 ct 墙处季节储能尖峰
-WALL_FINE_STEP = 10             # 边界精细化步长(kW): 接近100%渗透率时加密
-WALL_PEN_ENTER = 0.90           # 进入边界细化的能量渗透率阈值(%/100)
+# PV capacity scan (nameplate kW)
+PV_SCAN_MIN = 50                # Match greenfield: the old 9000 kW minimum is infeasible at ct>=80% (14.6 GWh generation vs 11.3 GWh load, a ratio of 1.29; ct=100% allows about 6956 kW). Start at 50; E_BAT_MAX=15000 retains the brownfield battery floor.
+PV_SCAN_MAX = 13000              # Raised to reach nearly 100% penetration at ct=60%, requiring about 11.6 MW.
+PV_SCAN_STEP = 50                # Finer step than the previous 250 kW to capture seasonal storage peaks near each ct boundary.
+WALL_FINE_STEP = 10             # Boundary refinement step in kW, used near 100% penetration.
+WALL_PEN_ENTER = 0.90           # Energy penetration threshold for boundary refinement, expressed as a fraction.
 
 
 def boundary_fine_tasks(results):
-    """根据粗扫 results 生成边界精细化任务 [(factor, pv_kw, ct_fraction), ...]。
-    对每个 (factor, ct): 从首次 energy_pen>=WALL_PEN_ENTER 的 PV 到 最大可行PV+一粗步,
-    以 WALL_FINE_STEP 加密, 跳过已算过的 PV 点。用于补全接近 100% 渗透率处的边界数据。"""
+    """Generate boundary refinement tasks [(factor, pv_kw, ct_fraction), ...] from coarse-scan results.
+    For each (factor, ct), start at the first PV capacity with energy_pen>=WALL_PEN_ENTER and end one coarse step beyond the largest feasible PV capacity.
+    Use WALL_FINE_STEP, skipping capacities already solved, to fill the boundary near 100% penetration."""
     existing = {(round(r["PV_MW"] * 1000), r["cons_target_pct"], r["bat_price_factor"])
                 for r in results}
     tasks = []
@@ -57,7 +57,7 @@ def boundary_fine_tasks(results):
             if len(pts) < 2 or not hi:
                 continue
             pv_start = hi[0]["PV_MW"] * 1000
-            pv_end = pts[-1]["PV_MW"] * 1000 + PV_SCAN_STEP  # 外探一粗步以探测悬崖
+            pv_end = pts[-1]["PV_MW"] * 1000 + PV_SCAN_STEP  # Probe one coarse step beyond the feasible range to locate the boundary.
             p = pv_start
             while p <= pv_end:
                 pi = round(p)
@@ -66,17 +66,17 @@ def boundary_fine_tasks(results):
                 p += WALL_FINE_STEP
     return tasks
 
-# --- 备用电源(电网)成本: 赞比亚 CEC 矿区平价电价, flat USD/kWh ---
+# Backup grid supply cost: flat Zambia CEC mining tariff in USD/kWh.
 GRID_PRICE_USD = 0.15
 
-# --- 单一电池储能(复用 Norway) ---
-E_BAT_MAX = 15000                # kWh 总容量下界 = 原始电池地板(merged; Zambia 原有 7500kW/15000kWh)
-BAT_POWER_RATIO = 2              # 能量:功率 = 2:1 (地板功率=E_BAT_MAX/2=7500kW)
+# Single battery storage, following Norway.
+E_BAT_MAX = 15000                # kWh: total capacity lower bound retaining Zambia's existing 7500 kW/15000 kWh battery.
+BAT_POWER_RATIO = 2              # Energy-to-power ratio = 2:1; minimum power = E_BAT_MAX/2 = 7500 kW.
 BAT_CAPEX = 300                  # $/kWh
 BAT_LIFE = 8
 BAT_OM_RATE = 0.01
 
-BAT_PRICE_FACTORS = [1.0]  # 仅成本因子1.0(海外场景)
+BAT_PRICE_FACTORS = [1.0]  # Overseas scenarios use only cost factor 1.0.
 
 ETA_CHARGE = 0.95
 ETA_DISCHARGE = 0.95
@@ -84,15 +84,15 @@ SOC_BAT_MIN = 0.1
 SOC_BAT_MAX = 0.9
 SOC_BAT_INIT = 0.5
 
-# --- 经济参数 ---
+# Economic parameters
 DISCOUNT_RATE = 0.05
 
-# --- 消纳率目标 ---
+# Renewable utilization targets
 CONSUMPTION_TARGETS = [0.6, 0.7, 0.8, 0.9, 1.0]
-CONSUMPTION_TOL = 0.0005       # 0.05%  (所有消纳率目标统一)
+CONSUMPTION_TOL = 0.0005       # 0.05% tolerance for all utilization targets
 
 # ============================================================
-# 2. 工具函数
+# 2. Helper functions
 # ============================================================
 
 def crf(rate, years):
@@ -102,7 +102,7 @@ def crf(rate, years):
 
 
 def load_raw_data(filepath=None):
-    """读 Annual_8760.xlsx: sheet PV / Load (各 col[1], 无表头). 电价用 flat GRID_PRICE_USD."""
+    """Read the second column of PV/Load in Annual_8760.xlsx without headers; use flat GRID_PRICE_USD."""
     if filepath is None:
         filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Annual_8760.xlsx")
     wb = openpyxl.load_workbook(filepath, read_only=True)
@@ -110,19 +110,19 @@ def load_raw_data(filepath=None):
     load_rows = list(wb["Load"].iter_rows(values_only=True))
     wb.close()
 
-    # 无表头 -> 不跳行; col[0]=hour-index, col[1]=功率kW
+    # No header to skip; col[0]=hour-index, col[1]=power in kW.
     pv_raw = [max(0.0, float(r[1])) for r in pv_rows if r[1] is not None]
     load = [float(r[1]) for r in load_rows if r[1] is not None]
 
     T = min(8760, len(pv_raw), len(load))
     pv_raw = pv_raw[:T]
     load = load[:T]
-    prices = [GRID_PRICE_USD] * T     # flat 平价电价
+    prices = [GRID_PRICE_USD] * T     # Flat electricity tariff
 
-    print(f"  PV: 峰值={max(pv_raw):.1f}kW, 年发电={sum(pv_raw):.0f}kWh (nameplate {PV_RATED_ORIGINAL}kW)")
-    print(f"  Load: 峰值={max(load):.1f}kW, 年耗电={sum(load):.0f}kWh")
+    print(f"  PV: peak={max(pv_raw):.1f}kW, annual generation={sum(pv_raw):.0f}kWh (nameplate {PV_RATED_ORIGINAL}kW)")
+    print(f"  Load: peak={max(load):.1f}kW, annual consumption={sum(load):.0f}kWh")
     print(f"  Grid price: {GRID_PRICE_USD} USD/kWh (flat)")
-    print(f"  数据长度: {T}h")
+    print(f"  Data length: {T}h")
     return pv_raw, load, prices
 
 
@@ -132,7 +132,7 @@ def scale_pv(pv_raw, pv_rated):
 
 
 # ============================================================
-# 3. 单场景 MILP 求解(PV+电池, 无风电)
+# 3. Solve one PV-battery MILP without wind power.
 # ============================================================
 
 def solve_scenario(pv, load, prices, pv_rated, consumption_target, bat_price_factor=1.0):
@@ -156,8 +156,8 @@ def solve_scenario(pv, load, prices, pv_rated, consumption_target, bat_price_fac
     model.setParam("TimeLimit", 300)
     mipgap = 0.005 if consumption_target < 0.8 else 0.02
     model.setParam("MIPGap", mipgap)
-    model.setParam("Threads", 1)   # 单线程确定性求解, 与并行版对齐, 保证串行==并行可复现
-    model.setParam("MIPFocus", 1)  # 可行性优先: 助快速找到可行解 → 延长高 ct/高 PV 曲线(减少 None 截断)
+    model.setParam("Threads", 1)   # Use one solver thread, matching the parallel version for consistent serial/parallel runs.
+    model.setParam("MIPFocus", 1)  # Prioritize feasibility to find solutions faster and reduce missing high-ct/high-PV points.
 
     idx = range(T)
 
@@ -204,7 +204,7 @@ def solve_scenario(pv, load, prices, pv_rated, consumption_target, bat_price_fac
     model.addConstr(E_bat[T - 1] == SOC_BAT_INIT * E_TOTAL, name="bat_final")
 
     curtail_sum = gp.quicksum(P_ren_curt[t] for t in idx)
-    cons_tol = CONSUMPTION_TOL   # 所有消纳目标统一用 0.05%
+    cons_tol = CONSUMPTION_TOL   # Use a 0.05% tolerance for every utilization target.
     max_curtail = (1 - consumption_target + cons_tol) * total_ren
     min_curtail = max(0, (1 - consumption_target - cons_tol) * total_ren)
     model.addConstr(curtail_sum <= max_curtail, name="curt_hi")
@@ -249,7 +249,7 @@ def solve_scenario(pv, load, prices, pv_rated, consumption_target, bat_price_fac
 
 
 # ============================================================
-# 4. 结果保存
+# 4. Save results.
 # ============================================================
 
 def save_to_excel(results, filename=None):
@@ -285,18 +285,18 @@ def save_to_excel(results, filename=None):
         ws.column_dimensions[col[0].column_letter].width = max_len + 2
 
     wb.save(filename)
-    print(f"结果已保存到 {filename}")
+    print(f"Results saved to {filename}")
 
 
 # ============================================================
-# 5. 可视化
+# 5. Visualization
 # ============================================================
 
 def plot_results(results, avg_load_mw=None):
     colors = ["tab:blue", "tab:orange", "tab:green", "tab:red", "tab:purple"]
     out_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # 图1: LCOE vs 渗透率
+    # Figure 1: LCOE vs penetration
     fig1, ax1 = plt.subplots(figsize=(11, 7))
     for i, ct in enumerate(CONSUMPTION_TARGETS):
         ct_pct = ct * 100
@@ -313,7 +313,7 @@ def plot_results(results, avg_load_mw=None):
     fig1.savefig(os.path.join(out_dir, "plot_lcoe_vs_penetration.png"), dpi=150)
     plt.close(fig1)
 
-    # 图2: PV容量 vs LCOE
+    # Figure 2: PV capacity vs LCOE
     fig2, ax2 = plt.subplots(figsize=(11, 7))
     for i, ct in enumerate(CONSUMPTION_TARGETS):
         ct_pct = ct * 100
@@ -330,7 +330,7 @@ def plot_results(results, avg_load_mw=None):
     fig2.savefig(os.path.join(out_dir, "plot_lcoe_vs_pv.png"), dpi=150)
     plt.close(fig2)
 
-    # 图3: PV容量 vs 电池容量
+    # Figure 3: PV capacity vs battery capacity
     fig3, ax3 = plt.subplots(figsize=(11, 7))
     for i, ct in enumerate(CONSUMPTION_TARGETS):
         ct_pct = ct * 100
@@ -347,7 +347,7 @@ def plot_results(results, avg_load_mw=None):
     fig3.savefig(os.path.join(out_dir, "plot_bat_capacity_vs_pv.png"), dpi=150)
     plt.close(fig3)
 
-    # 图4: 电池容量 vs 渗透率
+    # Figure 4: Battery capacity vs penetration
     fig4, ax4 = plt.subplots(figsize=(11, 7))
     for i, ct in enumerate(CONSUMPTION_TARGETS):
         ct_pct = ct * 100
@@ -367,7 +367,7 @@ def plot_results(results, avg_load_mw=None):
     saved = ["plot_lcoe_vs_penetration.png", "plot_lcoe_vs_pv.png",
              "plot_bat_capacity_vs_pv.png", "plot_capacity_vs_penetration.png"]
 
-    # 图5: 储能时长 vs 渗透率 (E_MWh / 平均负荷MW = h); 无数据点, PCHIP 平滑
+    # Figure 5: Storage duration vs penetration (E_MWh / mean load in MW = h); PCHIP curves without markers.
     if avg_load_mw and avg_load_mw > 0:
         fig5, ax5 = plt.subplots(figsize=(11, 7))
         for i, ct in enumerate(CONSUMPTION_TARGETS):
@@ -399,18 +399,18 @@ def plot_results(results, avg_load_mw=None):
         plt.close(fig5)
         saved.append("plot_duration_vs_penetration.png")
 
-    print("图表已保存: " + ", ".join(saved))
+    print("Figures saved: " + ", ".join(saved))
 
 
 # ============================================================
-# 6. 主程序
+# 6. Main program
 # ============================================================
 
 if __name__ == "__main__":
-    print("正在读取 Zambia 数据...")
+    print("Reading Zambia data...")
     pv_raw, load_data, price_data = load_raw_data()
     T = len(pv_raw)
-    avg_load_mw = sum(load_data) / len(load_data) / 1000   # 平均负荷(MW), 用于储能时长换算
+    avg_load_mw = sum(load_data) / len(load_data) / 1000   # Mean load in MW for converting storage capacity to duration.
 
     pv_values = list(range(PV_SCAN_MIN, PV_SCAN_MAX + PV_SCAN_STEP, PV_SCAN_STEP))
     n_pv = len(pv_values)
@@ -423,8 +423,8 @@ if __name__ == "__main__":
     n_ok = 0
     t_start = time.time()
 
-    print(f"扫描(Zambia PV+电池): {n_pv} PV档 × {n_ct} 消纳率 × {n_pf} 成本因子 = {n_total} 场景")
-    print(f"PV范围: {PV_SCAN_MIN/1000:.2f}~{PV_SCAN_MAX/1000:.1f} MW, 步长 {PV_SCAN_STEP/1000:.2f} MW")
+    print(f"Scan (Zambia PV + battery): {n_pv} PV capacity levels x {n_ct} utilization targets x {n_pf} cost factors = {n_total} scenarios")
+    print(f"PV range: {PV_SCAN_MIN/1000:.2f}~{PV_SCAN_MAX/1000:.1f} MW, step {PV_SCAN_STEP/1000:.2f} MW")
     print()
 
     for factor in BAT_PRICE_FACTORS:
@@ -437,8 +437,8 @@ if __name__ == "__main__":
                     elapsed = time.time() - t_start
                     rate = n_done / elapsed if elapsed > 0 else 0
                     eta = (n_total - n_done) / rate if rate > 0 else 0
-                    print(f"  进度 {n_done}/{n_total} ({n_done/n_total*100:.0f}%)  "
-                          f"可行 {n_ok}  已用 {elapsed:.0f}s  剩余 ~{eta:.0f}s")
+                    print(f"  Progress {n_done}/{n_total} ({n_done/n_total*100:.0f}%)  "
+                          f"feasible {n_ok}  elapsed {elapsed:.0f}s  remaining ~{eta:.0f}s")
 
                 r = solve_scenario(pv, load_data, price_data, pv_kw, ct, bat_price_factor=factor)
                 if r is not None:
@@ -446,13 +446,13 @@ if __name__ == "__main__":
                     n_ok += 1
 
     elapsed = time.time() - t_start
-    print(f"\n扫描完成: {n_ok}/{n_total} 可行, 耗时 {elapsed:.1f}s")
+    print(f"\nScan complete: {n_ok}/{n_total} feasible, elapsed {elapsed:.1f}s")
 
-    # --- 边界精细化补跑(与 parallel 一致): energy_pen>=WALL_PEN_ENTER 区间以 WALL_FINE_STEP 加密 ---
+    # Boundary refinement, matching the parallel version: use WALL_FINE_STEP where energy_pen>=WALL_PEN_ENTER.
     fine_tasks = boundary_fine_tasks(all_results)
     n_fine_ok = 0
     if fine_tasks:
-        print(f"\n边界精细化: {len(fine_tasks)} 个补充任务 (步长 {WALL_FINE_STEP} kW, "
+        print(f"\nBoundary refinement: {len(fine_tasks)} additional tasks (step {WALL_FINE_STEP} kW, "
               f"pen>={WALL_PEN_ENTER*100:.0f}%)")
         for factor, pv_kw, ct_frac in fine_tasks:
             pv = scale_pv(pv_raw, pv_kw)
@@ -460,10 +460,10 @@ if __name__ == "__main__":
             if r is not None:
                 all_results.append(r)
                 n_fine_ok += 1
-        print(f"边界精细化完成: 可行 {n_fine_ok}/{len(fine_tasks)}")
+        print(f"Boundary refinement complete: feasible {n_fine_ok}/{len(fine_tasks)}")
 
     if all_results:
         save_to_excel(all_results)
         plot_results(all_results, avg_load_mw=avg_load_mw)
     else:
-        print("无可行解, 请检查参数设置")
+        print("No feasible solution; check the parameters")

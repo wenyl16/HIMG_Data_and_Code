@@ -1,7 +1,7 @@
 """
-风光储电池容量优化 —— 多进程并行版 (部署到多核服务器)
-模型/逻辑/输出与 microgrid_wind_pv_bat_sizing_scan.py 完全一致, 仅主循环并行化。
-用法:
+Wind-PV-battery sizing: multiprocessing version for multicore servers
+Model, logic, and output match microgrid_wind_pv_bat_sizing_scan.py; only the main scan loop is parallelized.
+Usage:
     python microgrid_wind_pv_bat_sizing_scan_parallel.py
     N_WORKERS=32 python microgrid_wind_pv_bat_sizing_scan_parallel.py
 """
@@ -26,7 +26,7 @@ _W = {}
 
 
 def _init_worker():
-    """每个工作进程启动时执行一次: 限定单线程 + 载入数据。"""
+    """Initialize each worker once: limit solver threads and load the data."""
     gp.setParam("OutputFlag", 0)
     gp.setParam("Threads", 1)
     pv_raw, wind_raw, load = base.load_raw_data()
@@ -53,7 +53,7 @@ def _checkpoint(results, out_dir):
             filename=os.path.join(out_dir, "sensitivity_wind_pv_bat_sizing_checkpoint.xlsx"),
         )
     except Exception as e:
-        print(f"  [warn] 检查点写入失败: {e}")
+        print(f"  [warn] Could not write checkpoint: {e}")
 
 
 if __name__ == "__main__":
@@ -69,10 +69,10 @@ if __name__ == "__main__":
     n_total = len(tasks)
     n_workers = min(N_WORKERS, n_total)
 
-    print(f"并行扫描(风光电池): {n_total} 场景, 使用 {n_workers} 进程(每进程1线程)")
-    print(f"风光总容量: {base.RENEW_SCAN_MIN/1000:.3f}~{base.RENEW_SCAN_MAX/1000:.1f} MW, "
-          f"步长 {base.RENEW_SCAN_STEP/1000:.1f} MW, Wind:PV = 1000:835")
-    print(f"电池价格倍数: {base.BAT_PRICE_FACTORS}")
+    print(f"Parallel scan (wind + PV + battery): {n_total} scenarios, using {n_workers} processes (one thread per process)")
+    print(f"Total renewable capacity: {base.RENEW_SCAN_MIN/1000:.3f}~{base.RENEW_SCAN_MAX/1000:.1f} MW, "
+          f"step {base.RENEW_SCAN_STEP/1000:.1f} MW, Wind:PV = 1000:835")
+    print(f"Battery price factors: {base.BAT_PRICE_FACTORS}")
     print()
 
     results = []
@@ -89,8 +89,8 @@ if __name__ == "__main__":
             elapsed = time.time() - t_start
             rate = n_done / elapsed if elapsed > 0 else 0
             eta = (n_total - n_done) / rate if rate > 0 else 0
-            print(f"  进度 {n_done}/{n_total} ({n_done/n_total*100:.0f}%)  "
-                  f"可行 {n_ok}  已用 {elapsed:.0f}s  剩余 ~{eta:.0f}s")
+            print(f"  Progress {n_done}/{n_total} ({n_done/n_total*100:.0f}%)  "
+                  f"feasible {n_ok}  elapsed {elapsed:.0f}s  remaining ~{eta:.0f}s")
 
         if r is not None and n_ok > 0 and n_ok % CHECKPOINT_EVERY == 0:
             _checkpoint(results, out_dir)
@@ -98,7 +98,7 @@ if __name__ == "__main__":
     results.sort(key=lambda r: (r["bat_price_factor"], r["Total_Renewable_MW"], r["cons_target_pct"]))
 
     elapsed = time.time() - t_start
-    print(f"\n扫描完成: {n_ok}/{n_total} 可行, 耗时 {elapsed:.1f}s")
+    print(f"\nScan complete: {n_ok}/{n_total} feasible, elapsed {elapsed:.1f}s")
 
     if results:
         base.save_to_excel(results)
@@ -106,9 +106,9 @@ if __name__ == "__main__":
         cp = os.path.join(out_dir, "sensitivity_wind_pv_bat_sizing_checkpoint.xlsx")
         if os.path.exists(cp):
             os.remove(cp)
-            print("已清理检查点文件")
+            print("Checkpoint file removed")
     else:
-        print("无可行解, 请检查参数设置")
+        print("No feasible solution; check the parameters")
 
     for _p in list(getattr(pool, "_pool", [])):
         try:
